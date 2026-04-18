@@ -1,0 +1,15 @@
+spring:
+  mail:
+    username: ${SMTP_USERNAME:dev}
+    password: ${SMTP_PASSWORD:dev}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+management:
+  health:
+    mail:
+      enabled: false

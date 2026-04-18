@@ -1,0 +1,169 @@
+/*
+  Lead Rush extension — shared theme.
+  Mirrors the frontend's Linear-inspired Minimalist Maximalism so the extension
+  feels like an extension of the app, not a third-party tool.
+
+  No Tailwind — extension bundles should stay lean. Plain CSS custom properties.
+*/
+
+@import url('https://rsms.me/inter/inter.css');
+
+:root {
+  --lr-bg: hsl(240 6% 6%);
+  --lr-fg: hsl(240 5% 96%);
+  --lr-fg-muted: hsl(240 5% 60%);
+  --lr-card: hsl(240 6% 8%);
+  --lr-border: hsl(240 5% 100% / 0.08);
+  --lr-border-strong: hsl(240 5% 100% / 0.14);
+  --lr-input: hsl(240 6% 10%);
+  --lr-primary: hsl(243 70% 63%);
+  --lr-primary-fg: hsl(0 0% 100%);
+  --lr-success: hsl(150 60% 50%);
+  --lr-destructive: hsl(0 72% 58%);
+  --lr-radius: 8px;
+}
+
+.lr-reset, .lr-reset * {
+  box-sizing: border-box;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+}
+
+.lr-root {
+  color: var(--lr-fg);
+  background: var(--lr-bg);
+  background-image:
+    radial-gradient(600px 300px at 10% -10%, hsl(243 70% 22% / 0.35), transparent 60%),
+    radial-gradient(500px 250px at 110% 10%, hsl(280 70% 22% / 0.3),  transparent 55%);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lr-hairline { border: 1px solid var(--lr-border); }
+.lr-glass {
+  background: hsl(240 6% 9% / 0.72);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  border: 1px solid var(--lr-border);
+}
+
+.lr-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--lr-radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lr-button[disabled] { opacity: 0.5; pointer-events: none; }
+
+.lr-button--primary {
+  background: var(--lr-primary);
+  color: var(--lr-primary-fg);
+  box-shadow:
+    0 0 0 1px hsl(243 70% 63% / 0.3),
+    0 10px 24px -10px hsl(243 70% 63% / 0.5);
+}
+.lr-button--primary:hover { filter: brightness(1.08); }
+
+.lr-button--outline {
+  background: transparent;
+  color: var(--lr-fg);
+  border-color: var(--lr-border-strong);
+}
+.lr-button--outline:hover { background: hsl(240 5% 100% / 0.05); }
+
+.lr-button--ghost {
+  background: transparent;
+  color: var(--lr-fg-muted);
+}
+.lr-button--ghost:hover { background: hsl(240 5% 100% / 0.05); color: var(--lr-fg); }
+
+.lr-button--danger {
+  background: transparent;
+  color: var(--lr-destructive);
+  border-color: hsl(0 72% 58% / 0.3);
+}
+.lr-button--danger:hover { background: hsl(0 72% 58% / 0.08); }
+
+.lr-input, .lr-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--lr-radius);
+  border: 1px solid var(--lr-border-strong);
+  background: var(--lr-input);
+  color: var(--lr-fg);
+  font-size: 13px;
+  font-family: inherit;
+}
+.lr-input:focus, .lr-textarea:focus {
+  outline: none;
+  border-color: var(--lr-primary);
+  box-shadow: 0 0 0 3px hsl(243 70% 63% / 0.15);
+}
+.lr-textarea { resize: vertical; min-height: 64px; }
+
+.lr-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--lr-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.lr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: hsl(240 5% 100% / 0.06);
+  color: var(--lr-fg);
+  border: 1px solid var(--lr-border);
+}
+
+.lr-badge--primary { background: hsl(243 70% 63% / 0.15); color: hsl(243 90% 85%); border-color: hsl(243 70% 63% / 0.3); }
+.lr-badge--success { background: hsl(150 60% 50% / 0.15); color: hsl(150 70% 80%); border-color: hsl(150 60% 50% / 0.3); }
+
+.lr-muted { color: var(--lr-fg-muted); }
+.lr-gradient-text {
+  background: linear-gradient(180deg, hsl(0 0% 100%), hsl(240 10% 75%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes lr-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.lr-fade-up { animation: lr-fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes lr-spin {
+  to { transform: rotate(360deg); }
+}
+.lr-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid hsl(240 5% 100% / 0.15);
+  border-top-color: var(--lr-primary);
+  border-radius: 50%;
+  animation: lr-spin 700ms linear infinite;
+}
+
+/* Scrollbars to match the app */
+.lr-root ::-webkit-scrollbar { width: 8px; }
+.lr-root ::-webkit-scrollbar-track { background: transparent; }
+.lr-root ::-webkit-scrollbar-thumb { background: hsl(240 5% 22% / 0.6); border-radius: 999px; }

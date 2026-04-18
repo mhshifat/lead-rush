@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: leadrush-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lead-rush
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lead-rush"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: leadrush-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 30mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  maildev:
+    image: maildev/maildev:latest
+    container_name: leadrush-maildev
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "1080:1080"
+
+  backend:
+    build:
+      context: ./backend
+    container_name: leadrush-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      maildev:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:postgresql://postgres:5432/lead-rush
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: password
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: maildev
+      SMTP_PORT: "1025"
+      JWT_SECRET: local-dev-jwt-secret-do-not-use-in-production-min-32-chars
+      ENCRYPTION_KEY: replace_this_with_any_32_char_string
+      FRONTEND_URL: http://localhost:3000
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: leadrush-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NUXT_PUBLIC_API_BASE_URL: http://localhost:8080/api/v1
+      NUXT_API_BASE_URL_SERVER: http://backend:8080/api/v1
+    ports:
+      - "3001:3000"
+
+volumes:
+  postgres-data:
+  redis-data:
