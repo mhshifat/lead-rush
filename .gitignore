@@ -1,0 +1,40 @@
+# ── Backend (Spring Boot / Maven) ──
+backend/target/
+backend/*.jar
+backend/*.war
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# ── Node workspaces ──
+node_modules/
+frontend/.nuxt/
+frontend/.output/
+frontend/dist/
+extension/.wxt/
+extension/.output/
+widget/dist/
+
+# ── IDE ──
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# ── AI tooling (local, personal) ──
+.claude/
+.cursor/
+.aider*
+.windsurf/
+
+# ── Environment ──
+.env
+.env.local
+.env.*.local
+backend/src/main/resources/application-local.yml
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Logs ──
+*.log

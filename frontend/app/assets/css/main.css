@@ -1,0 +1,169 @@
+/*
+  Lead Rush — Design System
+  Linear-inspired Minimalist Maximalism.
+
+  Philosophy:
+    - Dark by default. Deep near-blacks, not pure black.
+    - Hairline borders (alpha on white), no heavy separators.
+    - Single accent family (indigo → violet) + neutral scale.
+    - Glass layer: tinted panels with blur when they sit over the animated background.
+    - Micro motion everywhere. Spring-ish easing, 150-250ms. No bouncy curves.
+    - Content-first — ornamentation lives behind content, never competes with it.
+*/
+
+/* Inter — the Linear typeface. Variable weights, served from rsms.me.
+   MUST be declared before `@import "tailwindcss"` because Tailwind v4
+   expands inline to ~2000 lines of CSS and @import rules must all
+   appear at the very top of the stylesheet per CSS spec. */
+@import url('https://rsms.me/inter/inter.css');
+
+@import "tailwindcss";
+
+@theme inline {
+  /* ── Neutral scale (dark by default) ── */
+  --color-background: hsl(240 6% 6%);            /* page */
+  --color-foreground: hsl(240 5% 96%);
+  --color-card: hsl(240 6% 8%);                  /* panels */
+  --color-card-foreground: hsl(240 5% 96%);
+  --color-popover: hsl(240 7% 9%);
+  --color-popover-foreground: hsl(240 5% 96%);
+  --color-muted: hsl(240 5% 14%);
+  --color-muted-foreground: hsl(240 5% 60%);
+  --color-accent: hsl(240 6% 12%);
+  --color-accent-foreground: hsl(240 5% 96%);
+  --color-border: hsl(240 5% 18% / 0.7);
+  --color-input: hsl(240 5% 18% / 0.7);
+  --color-ring: hsl(243 70% 63%);
+
+  /* ── Brand (Linear-ish indigo → violet) ── */
+  --color-primary: hsl(243 70% 63%);             /* #5E6AD2 */
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(240 5% 14%);
+  --color-secondary-foreground: hsl(240 5% 96%);
+
+  /* ── State ── */
+  --color-destructive: hsl(0 72% 58%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+
+  --radius: 0.6rem;
+
+  /* Sidebar — slightly lifted from the page */
+  --color-sidebar: hsl(240 6% 7%);
+  --color-sidebar-foreground: hsl(240 5% 80%);
+  --color-sidebar-primary: hsl(243 70% 63%);
+  --color-sidebar-primary-foreground: hsl(0 0% 100%);
+  --color-sidebar-accent: hsl(240 6% 11%);
+  --color-sidebar-accent-foreground: hsl(240 5% 96%);
+  --color-sidebar-border: hsl(240 5% 16% / 0.7);
+  --color-sidebar-ring: hsl(243 70% 63%);
+}
+
+/* ── Base ── */
+@layer base {
+  /* App-shell pages (layouts/default.vue) own their own scrolling via <main>.
+     Landing + auth pages (layout: false / auth) scroll the body normally.
+     We mark app-shell pages by adding `.no-body-scroll` to <html> from the
+     layout's mounted hook — no-op elsewhere so public pages still scroll. */
+  html.no-body-scroll,
+  html.no-body-scroll body {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  html {
+    color-scheme: dark;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, hsl(243 70% 22% / 0.30), transparent 60%),
+      radial-gradient(1000px 500px at 110% 10%, hsl(280 70% 22% / 0.25), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(240 5% 22% / 0.7);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(240 5% 30% / 0.9);
+    background-clip: padding-box;
+  }
+
+  ::selection {
+    background: hsl(243 70% 63% / 0.35);
+    color: hsl(0 0% 100%);
+  }
+}
+
+/* ── Utilities ── */
+@layer utilities {
+  .hairline { border: 1px solid hsl(240 5% 100% / 0.06); }
+
+  /* Decorative glass — sits over the animated hero background on landing + auth
+     pages where the blur + low alpha add atmosphere. Don't use for floating UI
+     elements (dropdowns, popovers) — the transparency makes them hard to read
+     against arbitrary page content. */
+  .glass {
+    background: hsl(240 6% 9% / 0.6);
+    backdrop-filter: blur(14px) saturate(120%);
+    -webkit-backdrop-filter: blur(14px) saturate(120%);
+    border: 1px solid hsl(240 5% 100% / 0.06);
+  }
+
+  /* Popover/dropdown panels — nearly opaque so content behind doesn't bleed
+     through. Subtle blur still applies for cohesion with the rest of the app. */
+  .popover-panel {
+    background: hsl(240 7% 9% / 0.98);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid hsl(240 5% 100% / 0.08);
+    box-shadow:
+      0 20px 40px -12px hsl(0 0% 0% / 0.6),
+      0 0 0 1px hsl(240 5% 100% / 0.04);
+  }
+
+  .glow-primary {
+    box-shadow:
+      0 0 0 1px hsl(243 70% 63% / 0.3),
+      0 12px 30px -10px hsl(243 70% 63% / 0.45);
+  }
+
+  .text-gradient {
+    background: linear-gradient(180deg, hsl(0 0% 100%), hsl(240 10% 75%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .enter-fade-up {
+    animation: enter-fade-up 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes enter-fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes drift-a {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50%      { transform: translate3d(8%, -4%, 0) scale(1.08); }
+  }
+  @keyframes drift-b {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50%      { transform: translate3d(-6%, 5%, 0) scale(0.94); }
+  }
+  @keyframes drift-c {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50%      { transform: translate3d(4%, 6%, 0) scale(1.12); }
+  }
+}
