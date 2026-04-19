@@ -60,10 +60,7 @@ const stats = [
 
     <!-- Nav -->
     <header class="relative z-10 mx-auto max-w-6xl px-6 py-5 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="inline-block w-6 h-6 rounded-md bg-linear-to-br from-indigo-400 to-purple-500" />
-        <span class="font-semibold tracking-tight">Lead Rush</span>
-      </div>
+      <SharedAppLogo with-wordmark />
       <nav class="flex items-center gap-2">
         <template v-if="isLoggedIn">
           <NuxtLink

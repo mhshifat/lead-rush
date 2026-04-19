@@ -1,14 +1,13 @@
-<!--
-  Chat inbox — two-pane layout (conversation list + message view).
-  Subscribes to /topic/chat/workspace/{workspaceId} via the authenticated WebSocket
-  so new messages appear in real time.
--->
 <script setup lang="ts">
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
+import { Input } from '~/components/ui/input'
 import { useQueryClient } from '@tanstack/vue-query'
 import { toast } from 'vue-sonner'
+import {
+  Settings, ArrowRight, MessageSquare, Search, Send, X,
+  Inbox, ExternalLink, User as UserIcon,
+} from 'lucide-vue-next'
 import type { ChatConversationSummaryDto, ChatMessageDto } from '~/types/api/chat.dto'
 
 definePageMeta({ middleware: 'auth' })
@@ -28,6 +27,24 @@ const closeMutation = useCloseChatConversation()
 const newMessage = ref('')
 const scrollerRef = ref<HTMLElement | null>(null)
 
+// ── Filter + search over the conversation list ──
+const statusFilter = ref<'ALL' | 'OPEN' | 'CLOSED'>('ALL')
+const searchQuery = ref('')
+
+const filteredConversations = computed(() => {
+  const all = conversationsPage.value?.content ?? []
+  const q = searchQuery.value.trim().toLowerCase()
+  return all.filter(c => {
+    if (statusFilter.value !== 'ALL' && c.status !== statusFilter.value) return false
+    if (!q) return true
+    const hay = `${c.visitorName ?? ''} ${c.visitorEmail ?? ''} ${c.lastMessagePreview ?? ''}`.toLowerCase()
+    return hay.includes(q)
+  })
+})
+
+const openCount = computed(() => (conversationsPage.value?.content ?? []).filter(c => c.status === 'OPEN').length)
+const closedCount = computed(() => (conversationsPage.value?.content ?? []).filter(c => c.status === 'CLOSED').length)
+
 // Deep-link: /chat?conversation=uuid opens that conversation
 onMounted(() => {
   const fromQuery = route.query.conversation as string | undefined
@@ -43,7 +60,6 @@ watch(conversationsPage, (page) => {
   }
 }, { immediate: true })
 
-// Auto-scroll to the bottom on new messages
 watch(() => conversation.value?.messages.length, async () => {
   await nextTick()
   if (scrollerRef.value) scrollerRef.value.scrollTop = scrollerRef.value.scrollHeight
@@ -58,7 +74,6 @@ onMounted(() => {
   if (!workspaceId || !$ws?.subscribe) return
   unsubscribe = $ws.subscribe(`/topic/chat/workspace/${workspaceId}`, (payload) => {
     const msg = payload as ChatMessageDto
-    // Update the specific conversation if it's the one open
     if (selectedId.value === msg.conversationId) {
       queryClient.setQueryData(
         ['chat', 'conversation', ref(selectedId.value)],
@@ -115,7 +130,7 @@ function formatTime(iso: string | null): string {
   const now = Date.now()
   const diffMs = now - d.getTime()
   const mins = Math.floor(diffMs / 60_000)
-  if (mins < 1) return 'just now'
+  if (mins < 1) return 'now'
   if (mins < 60) return `${mins}m`
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `${hours}h`
@@ -132,84 +147,176 @@ function formatFullTime(iso: string): string {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex items-start justify-between">
+  <div class="space-y-4 enter-fade-up">
+    <!-- Header -->
+    <div class="flex items-end justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold tracking-tight">Chat</h1>
-        <p class="text-sm text-muted-foreground">Live conversations from your embedded widget.</p>
+        <h1 class="text-2xl font-semibold tracking-tight">Chat</h1>
+        <p class="text-sm text-muted-foreground mt-0.5">
+          Live conversations from your embedded widget.
+        </p>
       </div>
-      <NuxtLink to="/chat/settings" class="text-sm text-primary hover:underline">
-        Widget settings →
+      <NuxtLink
+        to="/chat/settings"
+        class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Settings class="h-3.5 w-3.5" />
+        Widget settings
+        <ArrowRight class="h-3.5 w-3.5" />
       </NuxtLink>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-[22rem_1fr] gap-4 h-[calc(100vh-200px)] min-h-[500px]">
-      <!-- Conversation list -->
-      <Card class="overflow-hidden flex flex-col">
-        <CardHeader class="pb-3">
-          <CardTitle class="text-base">Conversations</CardTitle>
-          <CardDescription v-if="!isLoading && conversationsPage">
-            {{ conversationsPage.totalElements }} total
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="flex-1 overflow-y-auto p-0">
-          <div v-if="isLoading" class="p-4 text-sm text-muted-foreground text-center">Loading…</div>
-          <div v-else-if="!conversationsPage?.content.length" class="p-10 text-sm text-muted-foreground text-center">
-            No conversations yet.<br>
-            Embed the widget on your site to start capturing chats.
+    <div class="grid grid-cols-1 md:grid-cols-[22rem_1fr] gap-4 h-[calc(100vh-180px)] min-h-[500px]">
+      <!-- ── Conversation list ── -->
+      <div class="glass hairline rounded-xl overflow-hidden flex flex-col min-h-0">
+        <!-- List header: title + total + filter pills -->
+        <div class="px-4 py-3" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <Inbox class="h-4 w-4 text-muted-foreground" />
+              <h3 class="text-sm font-semibold tracking-tight">Conversations</h3>
+            </div>
+            <span class="text-xs text-muted-foreground tabular-nums">
+              {{ conversationsPage?.totalElements ?? 0 }}
+            </span>
+          </div>
+
+          <!-- Status filter pills -->
+          <div class="flex items-center gap-1 mb-2">
+            <button
+              v-for="opt in [
+                { key: 'ALL',    label: 'All',    count: conversationsPage?.totalElements ?? 0 },
+                { key: 'OPEN',   label: 'Open',   count: openCount },
+                { key: 'CLOSED', label: 'Closed', count: closedCount },
+              ]"
+              :key="opt.key"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+              :class="statusFilter === (opt.key as any)
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'"
+              @click="statusFilter = opt.key as any"
+            >
+              {{ opt.label }}
+              <span class="tabular-nums opacity-70">{{ opt.count }}</span>
+            </button>
+          </div>
+
+          <!-- Search -->
+          <div class="relative">
+            <Search class="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <Input
+              v-model="searchQuery"
+              placeholder="Search conversations…"
+              class="h-8 pl-8 text-xs"
+            />
+          </div>
+        </div>
+
+        <!-- List body -->
+        <div class="flex-1 overflow-y-auto min-h-0">
+          <div v-if="isLoading" class="p-4 text-sm text-muted-foreground text-center">
+            Loading…
+          </div>
+          <div
+            v-else-if="!conversationsPage?.content.length"
+            class="p-8 text-center"
+          >
+            <div class="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3">
+              <MessageSquare class="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p class="text-sm font-medium">No conversations yet</p>
+            <p class="text-xs text-muted-foreground mt-1">
+              Embed the widget on your site to start capturing chats.
+            </p>
+            <NuxtLink to="/chat/settings" class="inline-block mt-3 text-xs text-primary hover:underline">
+              Get widget code →
+            </NuxtLink>
+          </div>
+          <div
+            v-else-if="!filteredConversations.length"
+            class="p-8 text-center text-xs text-muted-foreground"
+          >
+            No conversations match your filters.
           </div>
           <ul v-else>
             <li
-              v-for="c in conversationsPage.content"
+              v-for="c in filteredConversations"
               :key="c.id"
               class="px-4 py-3 cursor-pointer transition-colors"
-              :class="selectedId === c.id ? 'bg-white/5' : 'hover:bg-white/5'"
-              style="border-top: 1px solid hsl(240 5% 100% / 0.06);"
+              :class="selectedId === c.id ? 'bg-primary/5' : 'hover:bg-white/5'"
+              style="border-top: 1px solid hsl(240 5% 100% / 0.05);"
               @click="selectedId = c.id"
             >
               <div class="flex items-start gap-3">
-                <div class="w-9 h-9 rounded-full bg-linear-to-br from-indigo-400 to-purple-500 text-white text-xs font-semibold flex items-center justify-center shrink-0">
-                  {{ initials(c.visitorName ?? c.visitorEmail) }}
+                <div class="relative shrink-0">
+                  <div class="w-9 h-9 rounded-full bg-linear-to-br from-indigo-400 to-purple-500 text-white text-xs font-semibold flex items-center justify-center">
+                    {{ initials(c.visitorName ?? c.visitorEmail) }}
+                  </div>
+                  <span
+                    class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background"
+                    :class="c.status === 'OPEN' ? 'bg-emerald-400' : 'bg-muted-foreground/40'"
+                  />
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between gap-2 mb-0.5">
                     <p class="text-sm font-medium truncate">{{ displayName(c) }}</p>
-                    <span class="text-xs text-muted-foreground shrink-0">{{ formatTime(c.lastMessageAt) }}</span>
+                    <span class="text-xs text-muted-foreground shrink-0 tabular-nums">{{ formatTime(c.lastMessageAt) }}</span>
                   </div>
                   <p class="text-xs text-muted-foreground truncate">{{ c.lastMessagePreview ?? 'No messages yet' }}</p>
-                  <div class="flex items-center gap-1.5 mt-1">
-                    <Badge v-if="c.status === 'CLOSED'" variant="outline" class="text-xs">Closed</Badge>
-                    <Badge v-if="c.unreadByTeam > 0 && c.status === 'OPEN'" variant="default" class="text-xs">
-                      {{ c.unreadByTeam }}
+                  <div v-if="c.unreadByTeam > 0 && c.status === 'OPEN'" class="flex items-center gap-1.5 mt-1">
+                    <Badge variant="default" class="text-[10px] h-4 px-1.5">
+                      {{ c.unreadByTeam }} unread
                     </Badge>
                   </div>
                 </div>
               </div>
             </li>
           </ul>
-        </CardContent>
-      </Card>
-
-      <!-- Conversation detail -->
-      <Card class="overflow-hidden flex flex-col">
-        <div v-if="!selectedId || !conversation" class="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-          Select a conversation
         </div>
+      </div>
+
+      <!-- ── Conversation detail ── -->
+      <div class="glass hairline rounded-xl overflow-hidden flex flex-col min-h-0">
+        <!-- Empty state when nothing selected -->
+        <div
+          v-if="!selectedId || !conversation"
+          class="flex-1 flex flex-col items-center justify-center text-center px-6"
+        >
+          <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
+            <MessageSquare class="h-5 w-5 text-muted-foreground" />
+          </div>
+          <h3 class="text-sm font-semibold tracking-tight">Select a conversation</h3>
+          <p class="text-sm text-muted-foreground mt-1 max-w-sm">
+            Pick a chat from the list on the left to read messages and reply in real time.
+          </p>
+        </div>
+
         <template v-else>
-          <!-- Header -->
-          <div class="px-4 py-3 flex items-center justify-between gap-3"
-               style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+          <!-- Detail header -->
+          <div
+            class="px-5 py-3 flex items-center justify-between gap-3"
+            style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);"
+          >
             <div class="flex items-center gap-3 min-w-0">
-              <div class="w-9 h-9 rounded-full bg-linear-to-br from-indigo-400 to-purple-500 text-white text-xs font-semibold flex items-center justify-center shrink-0">
-                {{ initials(conversation.visitorName ?? conversation.visitorEmail) }}
+              <div class="relative shrink-0">
+                <div class="w-10 h-10 rounded-full bg-linear-to-br from-indigo-400 to-purple-500 text-white text-sm font-semibold flex items-center justify-center">
+                  {{ initials(conversation.visitorName ?? conversation.visitorEmail) }}
+                </div>
+                <span
+                  class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background"
+                  :class="conversation.status === 'OPEN' ? 'bg-emerald-400' : 'bg-muted-foreground/40'"
+                />
               </div>
               <div class="min-w-0">
-                <p class="font-medium text-sm truncate">
-                  {{ conversation.visitorName ?? conversation.visitorEmail ?? 'Anonymous' }}
+                <p class="font-semibold tracking-tight truncate">
+                  {{ conversation.visitorName ?? conversation.visitorEmail ?? 'Anonymous visitor' }}
                 </p>
                 <p class="text-xs text-muted-foreground truncate">
-                  <span v-if="conversation.visitorEmail && conversation.visitorName">{{ conversation.visitorEmail }} · </span>
-                  <span v-if="conversation.sourceUrl">{{ conversation.sourceUrl }}</span>
+                  <span v-if="conversation.visitorEmail && conversation.visitorName">{{ conversation.visitorEmail }}</span>
+                  <span v-if="conversation.visitorEmail && conversation.visitorName && conversation.sourceUrl"> · </span>
+                  <span v-if="conversation.sourceUrl" class="font-mono">{{ conversation.sourceUrl }}</span>
+                  <span v-if="!conversation.visitorEmail && !conversation.sourceUrl">No identifying details</span>
                 </p>
               </div>
             </div>
@@ -217,44 +324,64 @@ function formatFullTime(iso: string): string {
               <NuxtLink
                 v-if="conversation.contactId"
                 :to="`/contacts/${conversation.contactId}`"
-                class="text-xs text-primary hover:underline"
-              >View contact →</NuxtLink>
+                class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <UserIcon class="h-3 w-3" />
+                Contact
+                <ArrowRight class="h-3 w-3" />
+              </NuxtLink>
               <Button
                 v-if="conversation.status === 'OPEN'"
                 size="sm"
                 variant="outline"
+                class="gap-1 h-8"
                 @click="handleClose"
-              >Close</Button>
+              >
+                <X class="h-3.5 w-3.5" />
+                Close
+              </Button>
               <Badge v-else variant="outline" class="text-xs">Closed</Badge>
             </div>
           </div>
 
-          <!-- Messages -->
-          <div ref="scrollerRef" class="flex-1 overflow-y-auto p-4 space-y-3">
+          <!-- Messages scroll area -->
+          <div ref="scrollerRef" class="flex-1 overflow-y-auto p-5 space-y-3 min-h-0">
             <div
               v-for="msg in conversation.messages"
               :key="msg.id"
               class="flex"
-              :class="msg.sender === 'AGENT' ? 'justify-end' : 'justify-start'"
+              :class="msg.sender === 'AGENT' ? 'justify-end' : msg.sender === 'SYSTEM' ? 'justify-center' : 'justify-start'"
             >
+              <!-- System / event message -->
               <div
                 v-if="msg.sender === 'SYSTEM'"
-                class="mx-auto text-xs text-muted-foreground italic"
-              >{{ msg.body }}</div>
-              <div
-                v-else
-                class="max-w-[75%] rounded-2xl px-3 py-2 text-sm"
-                :class="msg.sender === 'AGENT'
-                  ? 'bg-primary text-primary-foreground rounded-br-sm'
-                  : 'hairline bg-white/5 rounded-bl-sm'"
+                class="text-xs text-muted-foreground italic px-3 py-1 rounded-full hairline bg-white/2"
               >
-                <p class="whitespace-pre-wrap break-words">{{ msg.body }}</p>
+                {{ msg.body }}
+              </div>
+
+              <!-- Visitor or agent message bubble -->
+              <div v-else class="flex items-end gap-2 max-w-[75%]" :class="msg.sender === 'AGENT' ? 'flex-row-reverse' : ''">
                 <div
-                  class="text-[10px] mt-1 opacity-60"
-                  :class="msg.sender === 'AGENT' ? 'text-right' : 'text-left'"
+                  v-if="msg.sender === 'VISITOR'"
+                  class="w-7 h-7 rounded-full bg-linear-to-br from-indigo-400 to-purple-500 text-white text-[10px] font-semibold flex items-center justify-center shrink-0"
                 >
-                  <template v-if="msg.sender === 'AGENT' && msg.agentName">{{ msg.agentName }} · </template>
-                  {{ formatFullTime(msg.createdAt) }}
+                  {{ initials(conversation.visitorName ?? conversation.visitorEmail) }}
+                </div>
+                <div
+                  class="rounded-2xl px-3.5 py-2 text-sm"
+                  :class="msg.sender === 'AGENT'
+                    ? 'bg-primary text-primary-foreground rounded-br-sm'
+                    : 'hairline bg-white/5 rounded-bl-sm'"
+                >
+                  <p class="whitespace-pre-wrap wrap-break-word">{{ msg.body }}</p>
+                  <div
+                    class="text-[10px] mt-1 opacity-60 tabular-nums"
+                    :class="msg.sender === 'AGENT' ? 'text-right' : 'text-left'"
+                  >
+                    <template v-if="msg.sender === 'AGENT' && msg.agentName">{{ msg.agentName }} · </template>
+                    {{ formatFullTime(msg.createdAt) }}
+                  </div>
                 </div>
               </div>
             </div>
@@ -268,22 +395,39 @@ function formatFullTime(iso: string): string {
           >
             <textarea
               v-model="newMessage"
-              rows="2"
-              placeholder="Reply to this visitor…"
-              class="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none focus:outline-none focus:border-primary"
+              rows="1"
+              placeholder="Reply to this visitor — Enter to send, Shift+Enter for new line"
+              class="flex-1 max-h-32 rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40"
               @keydown.enter.exact.prevent="handleSend"
             />
-            <Button :disabled="!newMessage.trim() || sendMutation.isPending.value" @click="handleSend">Send</Button>
+            <Button
+              :disabled="!newMessage.trim() || sendMutation.isPending.value"
+              class="h-9 gap-1.5"
+              @click="handleSend"
+            >
+              <Send class="h-3.5 w-3.5" />
+              Send
+            </Button>
           </div>
           <div
             v-else
-            class="p-4 text-center text-xs text-muted-foreground"
+            class="p-4 text-center text-xs text-muted-foreground inline-flex items-center justify-center gap-1.5"
             style="border-top: 1px solid hsl(240 5% 100% / 0.06);"
           >
+            <X class="h-3 w-3" />
             This conversation is closed.
+            <a
+              v-if="conversation.sourceUrl"
+              :href="conversation.sourceUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-primary hover:underline inline-flex items-center gap-0.5 ml-2"
+            >
+              Visit page <ExternalLink class="h-3 w-3" />
+            </a>
           </div>
         </template>
-      </Card>
+      </div>
     </div>
   </div>
 </template>

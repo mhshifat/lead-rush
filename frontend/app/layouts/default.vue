@@ -69,8 +69,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('no-body-scroll'
       <!-- Logo + workspace switcher -->
       <div class="p-4 space-y-3" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
         <NuxtLink to="/" class="flex items-center gap-2 group">
-          <span class="inline-block w-6 h-6 rounded-md bg-linear-to-br from-indigo-400 to-purple-500 transition-transform group-hover:scale-105" />
-          <span class="font-semibold tracking-tight">Lead Rush</span>
+          <SharedAppLogo with-wordmark />
         </NuxtLink>
         <SharedWorkspaceSwitcher />
       </div>

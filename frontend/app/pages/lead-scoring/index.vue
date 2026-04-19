@@ -1,15 +1,19 @@
-<!--
-  Lead Scoring Rules management page.
-  Rules define "when TRIGGER happens (and optional CONDITION matches), add POINTS".
--->
 <script setup lang="ts">
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Badge } from '~/components/ui/badge'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import { Checkbox } from '~/components/ui/checkbox'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '~/components/ui/select'
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+} from '~/components/ui/dialog'
 import { toast } from 'vue-sonner'
+import {
+  Plus, Target, Zap, RotateCw, Pencil, Trash2, Power, PowerOff, ArrowRight,
+} from 'lucide-vue-next'
 import {
   TRIGGER_OPTIONS,
   CONDITION_OPERATOR_OPTIONS,
@@ -45,6 +49,7 @@ const form = ref<CreateLeadScoreRuleDto>({
 const errors = useFieldErrors()
 
 watch(() => form.value.name, v => { if (v.trim()) errors.remove('name') })
+watch(dialogOpen, (open) => { if (open) errors.clear() })
 
 function openCreate() {
   editing.value = null
@@ -78,11 +83,16 @@ function openEdit(rule: LeadScoreRuleEntity) {
   dialogOpen.value = true
 }
 
+function closeDialog() {
+  dialogOpen.value = false
+  editing.value = null
+  errors.clear()
+}
+
 async function handleSave() {
   errors.clear()
   if (!form.value.name.trim()) errors.set('name', 'Name is required.')
   if (Object.keys(errors.map).length) return
-  // Strip empty condition fields so backend treats them as null
   const payload: CreateLeadScoreRuleDto = {
     name: form.value.name.trim(),
     description: form.value.description?.trim() || undefined,
@@ -96,15 +106,24 @@ async function handleSave() {
   try {
     if (editing.value) {
       await updateMutation.mutateAsync({ id: editing.value.id, dto: payload })
+      closeDialog()
       toast.success('Rule updated')
     } else {
       await createMutation.mutateAsync(payload)
+      closeDialog()
       toast.success('Rule created')
     }
-    dialogOpen.value = false
   } catch (error: any) {
     errors.fromServerError(error, 'Failed to save rule')
   }
+}
+
+// Reka-ui Select rejects empty-string values. Clear state directly from the model
+// instead of feeding an empty SelectItem, which would silently abort the submit handler.
+function clearConditionField() {
+  form.value.conditionField = ''
+  form.value.conditionOperator = ''
+  form.value.conditionValue = ''
 }
 
 async function handleDelete(rule: LeadScoreRuleEntity) {
@@ -161,94 +180,213 @@ function triggerLabel(trigger: TriggerType): string {
   return TRIGGER_OPTIONS.find(t => t.value === trigger)?.label ?? trigger
 }
 
-function operatorLabel(op: ConditionOperator | null): string {
+function operatorLabel(op: ConditionOperator | null | undefined): string {
   if (!op) return ''
   return CONDITION_OPERATOR_OPTIONS.find(o => o.value === op)?.label ?? op
 }
 
-function fieldLabel(field: string | null): string {
+function fieldLabel(field: string | null | undefined): string {
   if (!field) return ''
   return CONDITION_FIELD_OPTIONS.find(f => f.value === field)?.label ?? field
 }
+
+// Totals shown above the rule list.
+const totals = computed(() => {
+  const list = rules.value ?? []
+  const enabled = list.filter(r => r.enabled).length
+  const positive = list.filter(r => r.enabled && r.points > 0).reduce((a, r) => a + r.points, 0)
+  const negative = list.filter(r => r.enabled && r.points < 0).reduce((a, r) => a + r.points, 0)
+  return {
+    total: list.length,
+    enabled,
+    positive,
+    negative,
+  }
+})
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-start justify-between">
+  <div class="space-y-5 enter-fade-up">
+    <!-- Header -->
+    <div class="flex items-end justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold">Lead Scoring</h1>
-        <p class="text-sm text-muted-foreground">
-          Rules automatically update a contact's lead score when something happens.
-          Higher scores = hotter leads.
+        <h1 class="text-2xl font-semibold tracking-tight">Lead scoring</h1>
+        <p class="text-sm text-muted-foreground mt-0.5">
+          Rules update a contact's score when something happens — higher score = hotter lead.
         </p>
       </div>
-      <div class="flex gap-2">
-        <Button variant="outline" @click="handleRecalculate" :disabled="recalcMutation.isPending.value">
+      <div class="flex items-center gap-2">
+        <Button
+          variant="outline"
+          class="gap-1.5"
+          :disabled="recalcMutation.isPending.value"
+          @click="handleRecalculate"
+        >
+          <RotateCw class="h-4 w-4" :class="recalcMutation.isPending.value ? 'animate-spin' : ''" />
           Recalculate all
         </Button>
-        <Button @click="openCreate">+ New rule</Button>
+        <Button class="gap-1.5" @click="openCreate">
+          <Plus class="h-4 w-4" />
+          New rule
+        </Button>
       </div>
     </div>
 
-    <div v-if="isLoading" class="text-center py-8 text-muted-foreground">Loading...</div>
-
-    <div v-else-if="!rules?.length" class="text-center py-16 border border-dashed rounded-lg">
-      <p class="text-muted-foreground mb-4">No scoring rules yet.</p>
-      <Button @click="openCreate">Create your first rule</Button>
+    <!-- Summary strip -->
+    <div
+      v-if="rules?.length"
+      class="glass hairline rounded-xl grid grid-cols-2 md:grid-cols-4 divide-x divide-white/5"
+    >
+      <div class="p-4">
+        <p class="text-xs text-muted-foreground">Rules</p>
+        <p class="mt-1 text-xl font-semibold tabular-nums">{{ totals.total }}</p>
+      </div>
+      <div class="p-4">
+        <p class="text-xs text-muted-foreground">Enabled</p>
+        <p class="mt-1 text-xl font-semibold tabular-nums">{{ totals.enabled }}</p>
+      </div>
+      <div class="p-4">
+        <p class="text-xs text-muted-foreground">Max add</p>
+        <p class="mt-1 text-xl font-semibold tabular-nums text-emerald-400">
+          +{{ totals.positive }}
+        </p>
+      </div>
+      <div class="p-4">
+        <p class="text-xs text-muted-foreground">Max deduct</p>
+        <p class="mt-1 text-xl font-semibold tabular-nums text-destructive">
+          {{ totals.negative }}
+        </p>
+      </div>
     </div>
 
+    <!-- Loading -->
+    <div
+      v-if="isLoading"
+      class="glass hairline rounded-xl py-16 text-center text-sm text-muted-foreground"
+    >
+      Loading rules…
+    </div>
+
+    <!-- Empty state -->
+    <div
+      v-else-if="!rules?.length"
+      class="glass hairline rounded-xl py-14 px-6 text-center"
+    >
+      <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+        <Target class="h-5 w-5 text-muted-foreground" />
+      </div>
+      <h3 class="text-sm font-semibold tracking-tight">No scoring rules yet</h3>
+      <p class="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+        A rule says "when X happens, add Y points." Stack a few to surface your hottest leads automatically.
+      </p>
+      <Button class="mt-5 gap-1.5" @click="openCreate">
+        <Plus class="h-4 w-4" />
+        Create your first rule
+      </Button>
+    </div>
+
+    <!-- Rule list -->
     <div v-else class="space-y-3">
-      <Card v-for="rule in rules" :key="rule.id">
-        <CardContent class="pt-6">
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex-1">
-              <div class="flex items-center gap-3 mb-1">
-                <h3 class="font-medium">{{ rule.name }}</h3>
-                <Badge v-if="rule.enabled" variant="default">Enabled</Badge>
-                <Badge v-else variant="outline">Disabled</Badge>
-                <Badge :variant="rule.points >= 0 ? 'secondary' : 'destructive'" class="font-mono">
+      <div
+        v-for="rule in rules"
+        :key="rule.id"
+        class="glass hairline rounded-xl p-4 transition-colors hover:bg-white/2"
+        :class="rule.enabled ? '' : 'opacity-60'"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex items-start gap-3 min-w-0 flex-1">
+            <div class="relative h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Zap class="h-4 w-4 text-primary" />
+              <span
+                class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-background"
+                :class="rule.enabled ? 'bg-emerald-400' : 'bg-muted-foreground/50'"
+              />
+            </div>
+            <div class="min-w-0 flex-1">
+              <!-- Title + badges -->
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="font-semibold tracking-tight truncate">{{ rule.name }}</h3>
+                <Badge
+                  :variant="rule.points >= 0 ? 'secondary' : 'destructive'"
+                  class="font-mono text-xs tabular-nums"
+                >
                   {{ rule.points >= 0 ? '+' : '' }}{{ rule.points }} pts
                 </Badge>
+                <Badge v-if="!rule.enabled" variant="outline" class="text-xs">Disabled</Badge>
               </div>
 
-              <p v-if="rule.description" class="text-sm text-muted-foreground mb-2">
+              <!-- Description -->
+              <p v-if="rule.description" class="text-xs text-muted-foreground mt-1">
                 {{ rule.description }}
               </p>
 
-              <div class="text-sm">
-                <span class="text-muted-foreground">When</span>
-                <span class="font-medium ml-1">{{ triggerLabel(rule.triggerType) }}</span>
+              <!-- Rule formula: trigger → condition → points -->
+              <div class="mt-3 flex items-center flex-wrap gap-1.5 text-xs">
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md hairline bg-white/2">
+                  <span class="text-muted-foreground">When</span>
+                  <span class="font-medium">{{ triggerLabel(rule.triggerType) }}</span>
+                </span>
                 <template v-if="rule.conditionField && rule.conditionOperator">
-                  <span class="text-muted-foreground ml-2">and</span>
-                  <span class="font-medium ml-1">{{ fieldLabel(rule.conditionField) }}</span>
-                  <span class="text-muted-foreground ml-1">{{ operatorLabel(rule.conditionOperator) }}</span>
-                  <span class="font-medium ml-1">"{{ rule.conditionValue }}"</span>
+                  <ArrowRight class="h-3 w-3 text-muted-foreground" />
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md hairline bg-white/2">
+                    <span class="font-medium">{{ fieldLabel(rule.conditionField) }}</span>
+                    <span class="text-muted-foreground">{{ operatorLabel(rule.conditionOperator) }}</span>
+                    <span class="font-medium">"{{ rule.conditionValue }}"</span>
+                  </span>
                 </template>
+                <ArrowRight class="h-3 w-3 text-muted-foreground" />
+                <span
+                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md font-mono tabular-nums"
+                  :class="rule.points >= 0 ? 'bg-emerald-400/10 text-emerald-400' : 'bg-destructive/10 text-destructive'"
+                >
+                  {{ rule.points >= 0 ? '+' : '' }}{{ rule.points }} pts
+                </span>
               </div>
             </div>
-
-            <div class="flex gap-2">
-              <Button size="sm" :variant="rule.enabled ? 'outline' : 'default'" @click="handleToggle(rule)">
-                {{ rule.enabled ? 'Disable' : 'Enable' }}
-              </Button>
-              <Button size="sm" variant="outline" @click="openEdit(rule)">Edit</Button>
-              <Button size="sm" variant="outline" class="text-destructive" @click="handleDelete(rule)">
-                Delete
-              </Button>
-            </div>
           </div>
-        </CardContent>
-      </Card>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-1 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              class="h-8 w-8 p-0"
+              :title="rule.enabled ? 'Disable' : 'Enable'"
+              @click="handleToggle(rule)"
+            >
+              <component :is="rule.enabled ? PowerOff : Power" class="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              class="h-8 w-8 p-0"
+              title="Edit"
+              @click="openEdit(rule)"
+            >
+              <Pencil class="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              class="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+              title="Delete"
+              @click="handleDelete(rule)"
+            >
+              <Trash2 class="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Create/edit dialog -->
+    <!-- Create / edit dialog -->
     <Dialog v-model:open="dialogOpen">
       <DialogContent class="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>{{ editing ? 'Edit rule' : 'New scoring rule' }}</DialogTitle>
-          <CardDescription>
+          <DialogDescription>
             Rules run automatically whenever the trigger event happens.
-          </CardDescription>
+          </DialogDescription>
         </DialogHeader>
 
         <div class="space-y-4 py-2">
@@ -258,73 +396,83 @@ function fieldLabel(field: string | null): string {
           >
             {{ errors.get('_form') }}
           </div>
+
           <div class="space-y-2">
             <Label for="name">Name *</Label>
             <Input
               id="name"
               v-model="form.name"
-              placeholder="e.g., CEO opened an email"
+              placeholder="e.g. CEO opened an email"
               :class="errors.has('name') ? 'border-destructive' : ''"
             />
             <SharedFormError :message="errors.get('name')" />
           </div>
 
           <div class="space-y-2">
-            <Label for="description">Description</Label>
-            <Input id="description" v-model="form.description" placeholder="Optional explanation" />
+            <Label for="description">Description <span class="text-muted-foreground font-normal">(optional)</span></Label>
+            <Input id="description" v-model="form.description" placeholder="Why this rule exists" />
           </div>
 
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label for="trigger">Trigger *</Label>
-              <select
-                id="trigger"
-                v-model="form.triggerType"
-                class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              >
-                <option v-for="t in TRIGGER_OPTIONS" :key="t.value" :value="t.value">
-                  {{ t.label }}
-                </option>
-              </select>
+              <Select v-model="form.triggerType">
+                <SelectTrigger id="trigger" class="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="t in TRIGGER_OPTIONS" :key="t.value" :value="t.value">
+                    {{ t.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
             <div class="space-y-2">
               <Label for="points">Points *</Label>
-              <Input id="points" v-model.number="form.points" type="number" placeholder="e.g., 10 or -5" />
+              <Input id="points" v-model.number="form.points" type="number" placeholder="e.g. 10 or -5" />
+              <p class="text-xs text-muted-foreground">Use negatives to deduct points.</p>
             </div>
           </div>
 
-          <div class="rounded-md border p-3 space-y-3">
-            <p class="text-xs text-muted-foreground">
-              <strong>Condition (optional).</strong> Leave blank to fire for every trigger event.
-            </p>
+          <div class="rounded-md hairline p-3 space-y-3 bg-white/2">
+            <div class="flex items-center justify-between">
+              <p class="text-xs text-muted-foreground">
+                <strong class="text-foreground font-medium">Condition</strong> — optional. Leave blank to fire on every trigger.
+              </p>
+              <button
+                v-if="form.conditionField"
+                type="button"
+                class="text-xs text-primary hover:underline"
+                @click="clearConditionField"
+              >Clear</button>
+            </div>
             <div class="grid grid-cols-3 gap-2">
               <div class="space-y-1">
                 <Label for="condField" class="text-xs">Field</Label>
-                <select
-                  id="condField"
-                  v-model="form.conditionField"
-                  class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                <Select
+                  :model-value="form.conditionField || undefined"
+                  @update:model-value="(v: any) => form.conditionField = typeof v === 'string' ? v : ''"
                 >
-                  <option value="">(none)</option>
-                  <option v-for="f in CONDITION_FIELD_OPTIONS" :key="f.value" :value="f.value">
-                    {{ f.label }}
-                  </option>
-                </select>
+                  <SelectTrigger id="condField" class="w-full"><SelectValue placeholder="(none)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="f in CONDITION_FIELD_OPTIONS" :key="f.value" :value="f.value">
+                      {{ f.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div class="space-y-1">
                 <Label for="condOp" class="text-xs">Operator</Label>
-                <select
-                  id="condOp"
-                  v-model="form.conditionOperator"
+                <Select
+                  :model-value="form.conditionOperator || undefined"
                   :disabled="!form.conditionField"
-                  class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  @update:model-value="(v: any) => form.conditionOperator = typeof v === 'string' ? v : ''"
                 >
-                  <option value="">(none)</option>
-                  <option v-for="o in CONDITION_OPERATOR_OPTIONS" :key="o.value" :value="o.value">
-                    {{ o.label }}
-                  </option>
-                </select>
+                  <SelectTrigger id="condOp" class="w-full"><SelectValue placeholder="(none)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="o in CONDITION_OPERATOR_OPTIONS" :key="o.value" :value="o.value">
+                      {{ o.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div class="space-y-1">
                 <Label for="condValue" class="text-xs">Value</Label>
@@ -332,22 +480,27 @@ function fieldLabel(field: string | null): string {
                   id="condValue"
                   v-model="form.conditionValue"
                   :disabled="!form.conditionField"
-                  placeholder="e.g., CEO"
+                  placeholder="e.g. CEO"
                 />
               </div>
             </div>
           </div>
 
-          <div class="flex items-center gap-2">
-            <input id="enabled" v-model="form.enabled" type="checkbox" class="h-4 w-4" />
-            <Label for="enabled" class="font-normal">Enabled</Label>
-          </div>
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <Checkbox :model-value="form.enabled" @update:model-value="(v) => form.enabled = v === true" />
+            <span class="text-sm">Enabled — rule fires for new events</span>
+          </label>
         </div>
 
         <DialogFooter>
           <Button variant="outline" @click="dialogOpen = false">Cancel</Button>
-          <Button @click="handleSave" :disabled="createMutation.isPending.value || updateMutation.isPending.value">
-            {{ editing ? 'Update' : 'Create' }}
+          <Button
+            :disabled="createMutation.isPending.value || updateMutation.isPending.value"
+            @click="handleSave"
+          >
+            {{ createMutation.isPending.value || updateMutation.isPending.value
+              ? 'Saving…'
+              : editing ? 'Update' : 'Create' }}
           </Button>
         </DialogFooter>
       </DialogContent>

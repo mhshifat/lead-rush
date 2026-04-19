@@ -6,6 +6,17 @@ export default defineNuxtConfig({
 
   ssr: true,
 
+  app: {
+    head: {
+      title: 'Lead Rush',
+      link: [
+        // SVG favicon — modern browsers prefer this over .ico, scales to any DPR.
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'alternate icon', type: 'image/x-icon', href: '/favicon.ico' },
+      ],
+    },
+  },
+
   // Pinned to 4000 to avoid port-sharing with a local Next.js app — cached browser
   // tabs can POST /__nextjs_original-stack-frames and crash vite-node otherwise.
   devServer: {

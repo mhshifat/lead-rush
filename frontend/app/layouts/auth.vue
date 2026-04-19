@@ -16,8 +16,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('no-body-scroll'
 
     <header class="relative z-10 shrink-0 mx-auto w-full max-w-6xl px-6 py-5 flex items-center justify-between">
       <NuxtLink to="/" class="flex items-center gap-2 group">
-        <span class="inline-block w-6 h-6 rounded-md bg-linear-to-br from-indigo-400 to-purple-500 transition-transform group-hover:scale-105" />
-        <span class="font-semibold tracking-tight">Lead Rush</span>
+        <SharedAppLogo with-wordmark />
       </NuxtLink>
       <NuxtLink
         to="/"
