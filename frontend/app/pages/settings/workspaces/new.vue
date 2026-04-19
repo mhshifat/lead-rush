@@ -7,6 +7,7 @@ import { toast } from 'vue-sonner'
 import { ArrowLeft, Building2, Sparkles, Lock, Database } from 'lucide-vue-next'
 
 definePageMeta({ middleware: 'auth' })
+useHead({ title: 'New workspace' })
 
 const name = ref('')
 const authStore = useAuthStore()

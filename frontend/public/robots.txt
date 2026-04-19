@@ -1,2 +1,40 @@
+# Lead Rush — robots policy
+# Public marketing + auth + user landing pages are crawlable.
+# Auth-gated app routes are blocked so Google doesn't waste crawl budget on
+# login redirects and won't index "Sign in" duplicates.
+
 User-Agent: *
-Disallow:
+
+# Block authenticated app surface
+Disallow: /dashboard
+Disallow: /contacts
+Disallow: /companies
+Disallow: /sequences
+Disallow: /pipelines
+Disallow: /deals
+Disallow: /mailboxes
+Disallow: /templates
+Disallow: /landing-pages
+Disallow: /forms
+Disallow: /enrichment
+Disallow: /lead-scoring
+Disallow: /analytics
+Disallow: /chat
+Disallow: /tasks
+Disallow: /notifications
+Disallow: /settings
+Disallow: /scraping
+Disallow: /invite
+
+# Block API + Nuxt internals
+Disallow: /api/
+Disallow: /_nuxt/
+Disallow: /__nuxt/
+
+# Public pages live here — let crawlers in
+Allow: /
+Allow: /auth/login
+Allow: /auth/register
+Allow: /p/
+
+Sitemap: /sitemap.xml

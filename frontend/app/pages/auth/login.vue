@@ -11,6 +11,7 @@ definePageMeta({
   layout: 'auth',
   middleware: 'guest',
 })
+useHead({ title: 'Sign in' })
 
 const authStore = useAuthStore()
 const route = useRoute()

@@ -9,6 +9,7 @@ import { Badge } from '~/components/ui/badge'
 import { notificationIcon, type NotificationEntity } from '~/entities/notification/notification.entity'
 
 definePageMeta({ middleware: 'auth' })
+useHead({ title: 'Notifications' })
 
 const store = useNotificationsStore()
 

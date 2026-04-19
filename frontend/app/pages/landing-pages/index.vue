@@ -15,6 +15,7 @@ import {
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Landing pages' })
 
 const { data: pages, isLoading } = useLandingPages()
 const createMutation = useCreateLandingPage()

@@ -25,6 +25,7 @@ import {
 import type { CreateLeadScoreRuleDto } from '~/types/api/lead-scoring.dto'
 
 definePageMeta({ middleware: 'auth' })
+useHead({ title: 'Lead scoring' })
 
 const { data: rules, isLoading } = useLeadScoreRules()
 const createMutation = useCreateLeadScoreRule()

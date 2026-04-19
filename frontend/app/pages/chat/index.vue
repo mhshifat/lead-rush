@@ -11,6 +11,7 @@ import {
 import type { ChatConversationSummaryDto, ChatMessageDto } from '~/types/api/chat.dto'
 
 definePageMeta({ middleware: 'auth' })
+useHead({ title: 'Chat' })
 
 const authStore = useAuthStore()
 const route = useRoute()

@@ -10,6 +10,7 @@ import { Label } from '~/components/ui/label'
 import { toast } from 'vue-sonner'
 
 definePageMeta({ middleware: 'auth' })
+useHead({ title: 'Chat settings' })
 
 const config = useRuntimeConfig()
 const { data: widget } = useChatWidgetConfig()

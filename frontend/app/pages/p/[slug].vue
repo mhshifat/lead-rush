@@ -42,15 +42,43 @@ interface PublicPageResponse {
   }>
 }
 
-// SEO
+// ── SEO ──
+const siteUrl = config.public.siteUrl || ''
+const canonicalUrl = computed(() => `${siteUrl}/p/${slug}`)
+
+// Title + description + OG/Twitter cards. The title escapes the global "· Lead Rush"
+// suffix because public landing pages should look like the user's brand, not ours.
 useHead(() => {
   const p = pageResponse.value?.data
   if (!p) return {}
+  const title = p.metaTitle ?? p.name
+  const description = p.metaDescription ?? `${p.name} — built with Lead Rush.`
   return {
-    title: p.metaTitle ?? p.name,
+    title,
+    titleTemplate: '%s', // bypass the global "· Lead Rush" suffix on public pages
+    link: [{ rel: 'canonical', href: canonicalUrl.value }],
     meta: [
-      p.metaDescription ? { name: 'description', content: p.metaDescription } : null,
-    ].filter((m): m is { name: string; content: string } => m !== null),
+      { name: 'description', content: description },
+      { property: 'og:title', content: title },
+      { property: 'og:description', content: description },
+      { property: 'og:url', content: canonicalUrl.value },
+      { property: 'og:type', content: 'website' },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:title', content: title },
+      { name: 'twitter:description', content: description },
+    ],
+    script: [
+      {
+        type: 'application/ld+json',
+        innerHTML: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          name: title,
+          description,
+          url: canonicalUrl.value,
+        }),
+      },
+    ],
   }
 })
 

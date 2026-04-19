@@ -12,6 +12,7 @@ import type { ContactFilters } from '~/composables/useContacts'
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Contacts' })
 
 const searchInput = ref('')
 const filters = ref<ContactFilters>({

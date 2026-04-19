@@ -18,6 +18,7 @@ import { Plus, Mail, Pencil, Trash2 } from 'lucide-vue-next'
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Templates' })
 
 const { data: templates, isLoading } = useEmailTemplates()
 const createMutation = useCreateEmailTemplate()

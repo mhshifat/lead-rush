@@ -17,6 +17,7 @@ import {
 import { ROLE_OPTIONS, type WorkspaceRole, type MemberEntity, type InvitationEntity } from '~/entities/workspace/member.entity'
 
 definePageMeta({ middleware: 'auth' })
+useHead({ title: 'Team' })
 
 const authStore = useAuthStore()
 

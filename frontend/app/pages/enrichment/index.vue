@@ -17,6 +17,7 @@ import type { EnrichmentProvider } from '~/composables/useEnrichment'
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Enrichment' })
 
 const { data: providers, isLoading } = useEnrichmentProviders()
 const updateMutation = useUpdateEnrichmentProvider()

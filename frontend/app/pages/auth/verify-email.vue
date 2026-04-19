@@ -5,6 +5,7 @@ definePageMeta({
   layout: 'auth',
   middleware: 'guest',
 })
+useHead({ title: 'Email verified' })
 
 const route = useRoute()
 const { $api } = useNuxtApp()

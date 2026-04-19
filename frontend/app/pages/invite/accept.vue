@@ -16,6 +16,7 @@ import { toast } from 'vue-sonner'
 
 // No auth middleware — this page is accessible without login (we show the preview first)
 definePageMeta({ layout: 'auth' })
+useHead({ title: 'Accept invite' })
 
 const route = useRoute()
 const token = computed(() => (route.query.token as string) ?? null)

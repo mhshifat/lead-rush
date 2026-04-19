@@ -13,6 +13,51 @@ definePageMeta({
 // Used to swap nav CTAs based on auth state without redirecting away.
 const isLoggedIn = computed(() => !!useCookie('accessToken').value)
 
+// ── SEO ──
+const config = useRuntimeConfig()
+const siteUrl = config.public.siteUrl || 'https://leadrush.com'
+
+useSeoMeta({
+  title: 'Lead Rush — All-in-one lead generation platform',
+  description: 'Multi-channel sequences, built-in deliverability, CRM, landing pages, chat, and data enrichment in one workspace. Replace 5+ tools with Lead Rush.',
+  ogTitle: 'Lead Rush — All-in-one lead generation platform',
+  ogDescription: 'Multi-channel sequences, built-in deliverability, CRM, landing pages, chat, and data enrichment in one workspace.',
+  ogUrl: siteUrl,
+  ogImage: `${siteUrl}/og-default.png`,
+  ogType: 'website',
+  twitterCard: 'summary_large_image',
+  twitterTitle: 'Lead Rush — All-in-one lead generation platform',
+  twitterDescription: 'Multi-channel sequences, built-in deliverability, CRM, landing pages, chat, and data enrichment in one workspace.',
+  twitterImage: `${siteUrl}/og-default.png`,
+})
+
+useHead({
+  link: [{ rel: 'canonical', href: siteUrl }],
+  script: [
+    {
+      type: 'application/ld+json',
+      // SoftwareApplication schema gives Google a structured signal that this is a SaaS
+      // product, not a blog or store. Helps with knowledge-panel + sitelinks eligibility.
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'Lead Rush',
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web',
+        url: siteUrl,
+        description: 'All-in-one lead generation platform — sequences, CRM, landing pages, chat, enrichment.',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        publisher: {
+          '@type': 'Organization',
+          name: 'Lead Rush',
+          url: siteUrl,
+          logo: `${siteUrl}/favicon.svg`,
+        },
+      }),
+    },
+  ],
+})
+
 const features = [
   {
     title: 'Multi-channel sequences',

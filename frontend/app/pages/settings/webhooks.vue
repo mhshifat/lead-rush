@@ -15,6 +15,7 @@ import {
 import type { WebhookEndpointApiDto, WebhookEndpointDto } from '~/types/api/webhook.dto'
 
 definePageMeta({ middleware: 'auth' })
+useHead({ title: 'Webhooks' })
 
 const { data: endpoints, isLoading } = useWebhooks()
 const { data: eventTypes } = useWebhookEventTypes()

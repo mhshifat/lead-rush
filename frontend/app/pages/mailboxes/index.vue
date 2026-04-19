@@ -16,6 +16,7 @@ import { toast } from 'vue-sonner'
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Mailboxes' })
 
 const { data: mailboxes, isLoading } = useMailboxes()
 const connectMutation = useConnectMailbox()

@@ -13,6 +13,7 @@ import {
 import type { ApiKeyApiDto } from '~/types/api/api-key.dto'
 
 definePageMeta({ middleware: 'auth' })
+useHead({ title: 'API keys' })
 
 const { data: keys, isLoading } = useApiKeys()
 const createMutation = useCreateApiKey()

@@ -24,6 +24,7 @@ const route = useRoute()
 const pipelineId = computed(() => route.params.id as string)
 
 const { data: pipeline, isLoading: pipelineLoading } = usePipeline(pipelineId)
+useHead(() => ({ title: pipeline.value?.name ?? 'Pipeline' }))
 const { data: deals } = usePipelineDeals(pipelineId)
 const { data: contacts } = useContacts(ref({ size: 200, page: 0 }))
 

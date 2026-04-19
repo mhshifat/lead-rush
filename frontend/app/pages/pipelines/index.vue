@@ -14,6 +14,7 @@ import {
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Pipelines' })
 
 const { data: pipelines, isLoading } = usePipelines()
 const createMutation = useCreatePipeline()

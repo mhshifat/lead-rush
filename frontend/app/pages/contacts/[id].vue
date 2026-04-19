@@ -25,6 +25,7 @@ const route = useRoute()
 const contactId = computed(() => route.params.id as string)
 
 const { data: contact, isLoading, isError } = useContact(contactId)
+useHead(() => ({ title: contact.value?.fullName ?? 'Contact' }))
 const { data: enrollments } = useContactEnrollments(contactId)
 const { data: timeline } = useContactTimeline(contactId)
 const { data: deals } = useContactDeals(contactId)

@@ -19,6 +19,9 @@ public interface LandingPageRepository extends JpaRepository<LandingPage, UUID> 
     /** Public lookup by slug — only returns PUBLISHED pages. */
     Optional<LandingPage> findBySlugAndStatus(String slug, LandingPage.Status status);
 
+    /** All published pages — used by the public sitemap. Cross-tenant on purpose. */
+    List<LandingPage> findByStatusOrderByPublishedAtDesc(LandingPage.Status status);
+
     /** Atomic view count increment. */
     @Modifying
     @Query("UPDATE LandingPage p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")

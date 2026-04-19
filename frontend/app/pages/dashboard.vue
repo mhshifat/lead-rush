@@ -14,6 +14,7 @@ import {
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Dashboard' })
 
 const authStore = useAuthStore()
 const { data: overview, isLoading } = useDashboardOverview()

@@ -7,6 +7,7 @@ definePageMeta({
   layout: 'auth',
   middleware: 'guest',
 })
+useHead({ title: 'Verify your email' })
 
 const authStore = useAuthStore()
 const route = useRoute()

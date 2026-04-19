@@ -12,6 +12,7 @@ import type { TaskFilters } from '~/composables/useTasks'
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Tasks' })
 
 const filters = ref<TaskFilters>({
   status: 'PENDING',

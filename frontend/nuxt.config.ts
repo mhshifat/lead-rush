@@ -8,11 +8,32 @@ export default defineNuxtConfig({
 
   app: {
     head: {
+      // Title template: pages set just their page name and the suffix is appended.
+      // useHead({ title: 'Contacts' }) → "Contacts · Lead Rush"
+      titleTemplate: '%s · Lead Rush',
       title: 'Lead Rush',
+      htmlAttrs: { lang: 'en' },
+      meta: [
+        { charset: 'utf-8' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'theme-color', content: '#0a0a0f' },
+        { name: 'description', content: 'All-in-one lead generation platform — contacts, sequences, landing pages, chat, and enrichment in one workspace.' },
+        { name: 'application-name', content: 'Lead Rush' },
+        // Open Graph defaults — pages can override per-page via useSeoMeta
+        { property: 'og:site_name', content: 'Lead Rush' },
+        { property: 'og:type', content: 'website' },
+        { property: 'og:title', content: 'Lead Rush' },
+        { property: 'og:description', content: 'All-in-one lead generation platform — contacts, sequences, landing pages, chat, and enrichment in one workspace.' },
+        // Twitter card defaults
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: 'Lead Rush' },
+        { name: 'twitter:description', content: 'All-in-one lead generation platform.' },
+      ],
       link: [
         // SVG favicon — modern browsers prefer this over .ico, scales to any DPR.
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
         { rel: 'alternate icon', type: 'image/x-icon', href: '/favicon.ico' },
+        { rel: 'apple-touch-icon', href: '/favicon.svg' },
       ],
     },
   },
@@ -55,6 +76,9 @@ export default defineNuxtConfig({
     // service name (e.g. http://backend:8080/api/v1). Falls back to the public URL.
     apiBaseUrlServer: process.env.NUXT_API_BASE_URL_SERVER || '',
     public: {
+      // Public site URL — used for canonical links, OG tags, and sitemap.xml.
+      // In dev defaults to localhost; in prod set NUXT_PUBLIC_SITE_URL=https://app.leadrush.com.
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'http://localhost:4000',
       apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1',
       // Cookie lifetimes in seconds. Must match (or exceed) the backend JWT
       // expiries or the user gets logged out before the token itself expires.

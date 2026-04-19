@@ -17,6 +17,7 @@ import {
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Forms' })
 
 const { data: forms, isLoading } = useForms()
 const { data: sequences } = useSequences()

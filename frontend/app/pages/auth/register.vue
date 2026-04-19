@@ -9,6 +9,7 @@ definePageMeta({
   layout: 'auth',
   middleware: 'guest',
 })
+useHead({ title: 'Create account' })
 
 const authStore = useAuthStore()
 

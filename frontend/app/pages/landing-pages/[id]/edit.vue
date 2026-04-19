@@ -26,6 +26,7 @@ const route = useRoute()
 const pageId = computed(() => route.params.id as string)
 
 const { data: page, isLoading } = useLandingPage(pageId)
+useHead(() => ({ title: page.value?.name ? `Edit · ${page.value.name}` : 'Edit landing page' }))
 const { data: forms } = useForms()
 const updateMutation = useUpdateLandingPage()
 const publishMutation = usePublishLandingPage()

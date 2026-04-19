@@ -17,6 +17,7 @@ import {
 definePageMeta({
   middleware: 'auth',
 })
+useHead({ title: 'Sequences' })
 
 const { data: sequences, isLoading } = useSequences()
 const { data: mailboxes } = useMailboxes()

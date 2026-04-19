@@ -25,6 +25,7 @@ const route = useRoute()
 const sequenceId = computed(() => route.params.id as string)
 
 const { data: sequence, isLoading } = useSequence(sequenceId)
+useHead(() => ({ title: sequence.value?.name ?? 'Sequence' }))
 const { data: templates } = useEmailTemplates()
 const addStepMutation = useAddSequenceStep()
 const deleteStepMutation = useDeleteSequenceStep()

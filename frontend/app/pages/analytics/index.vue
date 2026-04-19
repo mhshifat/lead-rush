@@ -10,6 +10,7 @@ import {
 } from 'lucide-vue-next'
 
 definePageMeta({ middleware: 'auth' })
+useHead({ title: 'Analytics' })
 
 type Tab = 'sequences' | 'pipelines' | 'contacts' | 'mailboxes'
 const tab = ref<Tab>('sequences')
