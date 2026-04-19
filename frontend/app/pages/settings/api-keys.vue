@@ -40,7 +40,13 @@ async function handleCreate() {
 }
 
 async function handleRevoke(k: ApiKeyApiDto) {
-  if (!confirm(`Revoke "${k.name}"? Any extension or integration using this key will stop working.`)) return
+  const ok = await useConfirm().ask({
+    title: `Revoke "${k.name}"?`,
+    description: 'Any extension or integration using this key will stop working immediately.',
+    confirmLabel: 'Revoke',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await revokeMutation.mutateAsync(k.id)
     toast.success('Key revoked')

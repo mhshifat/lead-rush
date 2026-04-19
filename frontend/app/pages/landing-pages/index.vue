@@ -52,7 +52,13 @@ async function handleTogglePublish(id: string, currentStatus: string) {
 }
 
 async function handleDelete(id: string, name: string) {
-  if (!confirm(`Delete page "${name}"?`)) return
+  const ok = await useConfirm().ask({
+    title: `Delete page "${name}"?`,
+    description: 'This cannot be undone.',
+    confirmLabel: 'Delete',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await deleteMutation.mutateAsync(id)
     toast.success('Page deleted')

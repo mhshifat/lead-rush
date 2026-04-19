@@ -73,7 +73,12 @@ async function handleAddStep() {
 }
 
 async function handleDeleteStep(stepId: string) {
-  if (!confirm('Delete this step?')) return
+  const ok = await useConfirm().ask({
+    title: 'Delete this step?',
+    confirmLabel: 'Delete',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await deleteStepMutation.mutateAsync({ sequenceId: sequenceId.value, stepId })
     toast.success('Step deleted')

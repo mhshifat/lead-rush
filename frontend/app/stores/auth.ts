@@ -11,8 +11,9 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserEntity | null>(null)
   const workspaces = ref<WorkspaceEntity[]>([])
 
-  const accessToken = useCookie('accessToken', { maxAge: 60 * 15 })
-  const refreshToken = useCookie('refreshToken', { maxAge: 60 * 60 * 24 * 7 })
+  const config = useRuntimeConfig()
+  const accessToken = useCookie('accessToken', { maxAge: config.public.accessTokenTtl as number })
+  const refreshToken = useCookie('refreshToken', { maxAge: config.public.refreshTokenTtl as number })
 
   const isLoggedIn = computed(() => !!accessToken.value)
   const hasPassword = computed(() => user.value?.hasPassword ?? false)
@@ -130,6 +131,12 @@ export const useAuthStore = defineStore('auth', () => {
     workspaces.value = WorkspaceMapper.toEntityList(data.workspaces)
   }
 
+  // Rehydrate user + workspaces without touching tokens — used by auth-init on page reload.
+  function hydrate(data: AuthResponseDto) {
+    user.value = UserMapper.toEntity(data.user)
+    workspaces.value = WorkspaceMapper.toEntityList(data.workspaces)
+  }
+
   function saveLastUsedAuth(email: string, provider: string) {
     if (import.meta.client) {
       localStorage.setItem('lastUsedAuth', JSON.stringify({
@@ -162,6 +169,7 @@ export const useAuthStore = defineStore('auth', () => {
     refresh,
     logout,
     switchWorkspace,
+    hydrate,
     getLastUsedAuth,
   }
 })

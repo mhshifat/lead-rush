@@ -1,18 +1,17 @@
-<!--
-  Contact Detail Page — shows full contact info + enrollments + enroll button.
-
-  This is where the outreach loop completes:
-    Contact detail → "Enroll in Sequence" button → pick ACTIVE sequence → enroll
-    → SequenceExecutionJob runs every 60s → first email gets sent → contact
-    eventually receives the full sequence based on delay_days between steps.
--->
 <script setup lang="ts">
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Badge } from '~/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '~/components/ui/dialog'
 import { toast } from 'vue-sonner'
+import {
+  ArrowLeft, Sparkles, UserPlus, Trash2, TrendingUp,
+  Mail, Phone, Globe, Linkedin, Twitter,
+  AtSign, Activity, Briefcase, History, Clock,
+  Send, Eye, MousePointerClick, Reply, Target, CheckCircle2,
+  XCircle, ClipboardList, Check,
+} from 'lucide-vue-next'
 
 definePageMeta({
   middleware: 'auth',
@@ -35,7 +34,6 @@ const enrichMutation = useEnrichContact()
 const { data: scoreHistory } = useLeadScoreHistory(contactId)
 const adjustScoreMutation = useAdjustScore()
 
-// ── Score adjustment dialog ──
 const adjustDialogOpen = ref(false)
 const adjustPoints = ref<number>(10)
 const adjustReason = ref('')
@@ -60,7 +58,6 @@ async function handleAdjustScore() {
   }
 }
 
-// ── Enrich button ──
 async function handleEnrich() {
   if (!contact.value) return
   try {
@@ -79,17 +76,14 @@ async function handleEnrich() {
   }
 }
 
-// ── Enroll dialog state ──
 const enrollDialogOpen = ref(false)
 const selectedSequenceId = ref('')
 const selectedMailboxId = ref('')
 
-// Only show ACTIVE sequences (DRAFT can't accept enrollments, PAUSED is stopped)
 const enrollableSequences = computed(() =>
   (sequences.value ?? []).filter(s => s.status === 'ACTIVE')
 )
 
-// Exclude sequences the contact is already actively enrolled in
 const enrollableSequencesFiltered = computed(() => {
   const enrolledIds = new Set(
     (enrollments.value ?? [])
@@ -104,7 +98,6 @@ async function handleEnroll() {
     toast.error('Please select a sequence')
     return
   }
-
   try {
     await enrollMutation.mutateAsync({
       sequenceId: selectedSequenceId.value,
@@ -124,8 +117,13 @@ async function handleEnroll() {
 
 async function handleDelete() {
   if (!contact.value) return
-  if (!confirm(`Delete ${contact.value.fullName}? This cannot be undone.`)) return
-
+  const ok = await useConfirm().ask({
+    title: `Delete ${contact.value.fullName}?`,
+    description: 'This cannot be undone.',
+    confirmLabel: 'Delete',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await deleteMutation.mutateAsync(contact.value.id)
     toast.success('Contact deleted')
@@ -182,399 +180,451 @@ function formatCurrency(amount: number | null, currency: string | null): string 
   }
 }
 
-function eventIcon(type: string): string {
+function eventIconComponent(type: string) {
   switch (type) {
-    case 'EMAIL_SENT': return '📤'
-    case 'EMAIL_OPENED': return '👁️'
-    case 'EMAIL_CLICKED': return '🔗'
-    case 'EMAIL_REPLIED': return '↩️'
-    case 'ENROLLED': return '🎯'
-    case 'SEQUENCE_COMPLETED': return '✅'
-    case 'UNSUBSCRIBED': return '🚫'
-    case 'TASK_CREATED': return '📋'
-    case 'TASK_COMPLETED': return '✔️'
-    default: return '•'
+    case 'EMAIL_SENT': return Send
+    case 'EMAIL_OPENED': return Eye
+    case 'EMAIL_CLICKED': return MousePointerClick
+    case 'EMAIL_REPLIED': return Reply
+    case 'ENROLLED': return Target
+    case 'SEQUENCE_COMPLETED': return CheckCircle2
+    case 'UNSUBSCRIBED': return XCircle
+    case 'TASK_CREATED': return ClipboardList
+    case 'TASK_COMPLETED': return Check
+    default: return Activity
   }
 }
 </script>
 
 <template>
-  <div class="space-y-6">
-    <NuxtLink to="/contacts" class="text-sm text-muted-foreground hover:text-foreground">
-      ← Back to contacts
+  <div class="space-y-5 enter-fade-up">
+    <!-- Back link -->
+    <NuxtLink
+      to="/contacts"
+      class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+    >
+      <ArrowLeft class="h-3.5 w-3.5" />
+      Back to contacts
     </NuxtLink>
 
-    <div v-if="isLoading" class="text-center py-8 text-muted-foreground">
-      Loading contact...
+    <!-- Loading -->
+    <div v-if="isLoading" class="glass hairline rounded-xl py-16 text-center text-sm text-muted-foreground">
+      Loading contact…
     </div>
 
-    <div v-else-if="isError || !contact" class="text-center py-8 text-destructive">
+    <!-- Error -->
+    <div v-else-if="isError || !contact" class="glass hairline rounded-xl py-16 text-center text-sm text-destructive">
       Contact not found
     </div>
 
-    <div v-else class="space-y-6">
-      <!-- Header card -->
-      <Card>
-        <CardContent class="pt-6">
-          <div class="flex items-start justify-between">
-            <div class="flex items-center gap-4">
-              <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center text-2xl font-bold text-muted-foreground">
-                {{ contact.firstName.charAt(0) }}{{ contact.lastName?.charAt(0) ?? '' }}
-              </div>
-              <div>
-                <h1 class="text-2xl font-bold">{{ contact.fullName }}</h1>
-                <p v-if="contact.title" class="text-muted-foreground">{{ contact.title }}</p>
-                <p v-if="contact.companyName" class="text-sm text-muted-foreground">
-                  at {{ contact.companyName }}
-                </p>
-              </div>
+    <div v-else class="space-y-5">
+      <!-- Header -->
+      <div class="glass hairline rounded-xl p-6">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div class="flex items-center gap-4 min-w-0">
+            <div
+              class="h-14 w-14 shrink-0 rounded-full flex items-center justify-center text-lg font-semibold text-white"
+              style="background: linear-gradient(135deg, hsl(240 4% 95% / 0.08), hsl(var(--primary) / 0.35));"
+            >
+              {{ contact.firstName.charAt(0) }}{{ contact.lastName?.charAt(0) ?? '' }}
             </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h1 class="text-xl font-semibold tracking-tight truncate">{{ contact.fullName }}</h1>
+                <Badge :variant="stageBadgeVariant(contact.lifecycleStage)">
+                  {{ contact.lifecycleStage }}
+                </Badge>
+              </div>
+              <p class="text-sm text-muted-foreground truncate mt-0.5">
+                <span v-if="contact.title">{{ contact.title }}</span>
+                <span v-if="contact.title && contact.companyName"> · </span>
+                <span v-if="contact.companyName">{{ contact.companyName }}</span>
+                <span v-if="!contact.title && !contact.companyName">—</span>
+              </p>
+            </div>
+          </div>
 
-            <div class="flex items-center gap-2">
-              <Badge :variant="stageBadgeVariant(contact.lifecycleStage)">
-                {{ contact.lifecycleStage }}
-              </Badge>
+          <div class="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm" variant="outline"
+              class="h-9 px-3 gap-1.5"
+              @click="handleEnrich"
+              :disabled="enrichMutation.isPending.value"
+            >
+              <Sparkles class="h-3.5 w-3.5" />
+              {{ enrichMutation.isPending.value ? 'Enriching…' : 'Enrich' }}
+            </Button>
 
-              <!-- ENRICH BUTTON -->
-              <Button size="sm" variant="outline" @click="handleEnrich" :disabled="enrichMutation.isPending.value">
-                {{ enrichMutation.isPending.value ? 'Enriching...' : '✨ Enrich' }}
-              </Button>
+            <Dialog v-model:open="enrollDialogOpen">
+              <DialogTrigger as-child>
+                <Button size="sm" class="h-9 px-3 gap-1.5" :disabled="!contact.primaryEmail">
+                  <UserPlus class="h-3.5 w-3.5" />
+                  Enroll
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Enroll {{ contact.fullName }}</DialogTitle>
+                  <DialogDescription>
+                    Pick a sequence and the mailbox to send from. First email ships within 60 seconds.
+                  </DialogDescription>
+                </DialogHeader>
 
-              <!-- ENROLL IN SEQUENCE BUTTON -->
-              <Dialog v-model:open="enrollDialogOpen">
-                <DialogTrigger as-child>
-                  <Button size="sm" :disabled="!contact.primaryEmail">
-                    Enroll in Sequence
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Enroll {{ contact.fullName }}</DialogTitle>
-                    <DialogDescription>
-                      Pick a sequence and the mailbox to send from. The first email will be sent within 60 seconds.
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div class="space-y-4">
-                    <div v-if="!contact.primaryEmail" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                      This contact has no email address. Add one before enrolling.
-                    </div>
-
-                    <div class="space-y-2">
-                      <Label for="sequence">Sequence *</Label>
-                      <select
-                        id="sequence"
-                        v-model="selectedSequenceId"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="">Select a sequence</option>
-                        <option
-                          v-for="seq in enrollableSequencesFiltered"
-                          :key="seq.id"
-                          :value="seq.id"
-                        >
-                          {{ seq.name }} ({{ seq.steps.length }} steps)
-                        </option>
-                      </select>
-                      <p v-if="!enrollableSequencesFiltered.length" class="text-xs text-muted-foreground">
-                        No available sequences. Create and activate a sequence first, or this contact is already enrolled in all active sequences.
-                      </p>
-                    </div>
-
-                    <div class="space-y-2">
-                      <Label for="mailbox">Mailbox (optional — uses sequence default)</Label>
-                      <select
-                        id="mailbox"
-                        v-model="selectedMailboxId"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="">Use sequence default</option>
-                        <option v-for="mb in mailboxes" :key="mb.id" :value="mb.id">
-                          {{ mb.name }} ({{ mb.email }})
-                        </option>
-                      </select>
-                    </div>
+                <div class="space-y-4">
+                  <div v-if="!contact.primaryEmail" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                    This contact has no email address. Add one before enrolling.
                   </div>
 
-                  <DialogFooter>
-                    <Button variant="outline" @click="enrollDialogOpen = false">Cancel</Button>
-                    <Button
-                      @click="handleEnroll"
-                      :disabled="!selectedSequenceId || enrollMutation.isPending.value"
+                  <div class="space-y-2">
+                    <Label for="sequence">Sequence</Label>
+                    <select
+                      id="sequence"
+                      v-model="selectedSequenceId"
+                      class="w-full rounded-md bg-background px-3 py-2 text-sm border border-input focus:outline-none focus:ring-2 focus:ring-ring"
                     >
-                      {{ enrollMutation.isPending.value ? 'Enrolling...' : 'Enroll' }}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                      <option value="">Select a sequence</option>
+                      <option
+                        v-for="seq in enrollableSequencesFiltered"
+                        :key="seq.id"
+                        :value="seq.id"
+                      >
+                        {{ seq.name }} ({{ seq.steps.length }} steps)
+                      </option>
+                    </select>
+                    <p v-if="!enrollableSequencesFiltered.length" class="text-xs text-muted-foreground">
+                      No available sequences. Create and activate one, or this contact may already be enrolled everywhere.
+                    </p>
+                  </div>
 
-              <Button variant="destructive" size="sm" @click="handleDelete" :disabled="deleteMutation.isPending.value">
-                Delete
-              </Button>
-            </div>
+                  <div class="space-y-2">
+                    <Label for="mailbox">Mailbox <span class="text-muted-foreground font-normal">(optional)</span></Label>
+                    <select
+                      id="mailbox"
+                      v-model="selectedMailboxId"
+                      class="w-full rounded-md bg-background px-3 py-2 text-sm border border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">Use sequence default</option>
+                      <option v-for="mb in mailboxes" :key="mb.id" :value="mb.id">
+                        {{ mb.name }} ({{ mb.email }})
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" @click="enrollDialogOpen = false">Cancel</Button>
+                  <Button
+                    @click="handleEnroll"
+                    :disabled="!selectedSequenceId || enrollMutation.isPending.value"
+                  >
+                    {{ enrollMutation.isPending.value ? 'Enrolling…' : 'Enroll' }}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Button
+              variant="outline"
+              size="sm"
+              class="h-9 px-3 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+              @click="handleDelete"
+              :disabled="deleteMutation.isPending.value"
+            >
+              <Trash2 class="h-3.5 w-3.5" />
+              Delete
+            </Button>
           </div>
+        </div>
 
-          <!-- Tags -->
-          <div v-if="contact.tags.length > 0" class="flex flex-wrap gap-2 mt-4">
-            <Badge v-for="tag in contact.tags" :key="tag.id" variant="secondary">
-              {{ tag.name }}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Contact info -->
-        <Card>
-          <CardHeader>
-            <CardTitle class="text-base">Contact Information</CardTitle>
-          </CardHeader>
-          <CardContent class="space-y-4 text-sm">
-            <div v-if="contact.emails.length > 0">
-              <div class="font-medium mb-1">Email Addresses</div>
-              <div v-for="email in contact.emails" :key="email.id" class="flex items-center gap-2">
-                <span>{{ email.email }}</span>
-                <Badge v-if="email.isPrimary" variant="outline" class="text-xs">Primary</Badge>
-                <Badge variant="secondary" class="text-xs">{{ email.emailType }}</Badge>
-              </div>
-            </div>
-
-            <div v-if="contact.phones.length > 0">
-              <div class="font-medium mb-1">Phone Numbers</div>
-              <div v-for="phone in contact.phones" :key="phone.id" class="flex items-center gap-2">
-                <span>{{ phone.phone }}</span>
-                <Badge v-if="phone.isPrimary" variant="outline" class="text-xs">Primary</Badge>
-                <Badge variant="secondary" class="text-xs">{{ phone.phoneType }}</Badge>
-              </div>
-            </div>
-
-            <div v-if="contact.website || contact.linkedinUrl || contact.twitterUrl" class="space-y-1">
-              <div class="font-medium">Links</div>
-              <a v-if="contact.website" :href="contact.website" target="_blank" class="block text-primary hover:underline">
-                Website
-              </a>
-              <a v-if="contact.linkedinUrl" :href="contact.linkedinUrl" target="_blank" class="block text-primary hover:underline">
-                LinkedIn
-              </a>
-              <a v-if="contact.twitterUrl" :href="contact.twitterUrl" target="_blank" class="block text-primary hover:underline">
-                Twitter
-              </a>
-            </div>
-          </CardContent>
-        </Card>
-
-        <!-- Metadata -->
-        <Card>
-          <CardHeader>
-            <CardTitle class="text-base">Details</CardTitle>
-          </CardHeader>
-          <CardContent class="space-y-3 text-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-muted-foreground">Lead Score</span>
-              <div class="flex items-center gap-2">
-                <span class="font-medium text-base">{{ contact.leadScore }}</span>
-                <Button size="sm" variant="outline" class="h-6 text-xs px-2" @click="adjustDialogOpen = true">
-                  Adjust
-                </Button>
-              </div>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-muted-foreground">Source</span>
-              <span>{{ contact.source ?? '—' }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-muted-foreground">Last Contacted</span>
-              <span>{{ formatDate(contact.lastContactedAt) }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-muted-foreground">Created</span>
-              <span>{{ formatDate(contact.createdAt) }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-muted-foreground">Updated</span>
-              <span>{{ formatDate(contact.updatedAt) }}</span>
-            </div>
-          </CardContent>
-        </Card>
+        <div v-if="contact.tags.length > 0" class="flex flex-wrap gap-1.5 mt-5">
+          <Badge v-for="tag in contact.tags" :key="tag.id" variant="secondary">
+            {{ tag.name }}
+          </Badge>
+        </div>
       </div>
 
-      <!-- SEQUENCE ENROLLMENTS -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="text-base">Sequence Enrollments</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div v-if="!enrollments?.length" class="text-sm text-muted-foreground py-4">
-            This contact is not enrolled in any sequences yet.
+      <!-- Contact info + Details grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Contact info -->
+        <div class="glass hairline rounded-xl p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <AtSign class="h-4 w-4 text-muted-foreground" />
+            <h2 class="text-sm font-semibold tracking-tight">Contact information</h2>
           </div>
-          <ul v-else class="space-y-2">
-            <li
-              v-for="enrollment in enrollments"
-              :key="enrollment.id"
-              class="flex items-center justify-between p-3 rounded-md border bg-card hover:border-primary cursor-pointer"
-              @click="navigateTo(`/sequences/${enrollment.sequenceId}`)"
-            >
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="font-medium">{{ enrollment.sequenceName }}</span>
-                  <Badge :variant="enrollmentStatusVariant(enrollment.status)">
-                    {{ enrollment.status }}
-                  </Badge>
-                </div>
-                <div class="text-xs text-muted-foreground space-x-3">
-                  <span>Step {{ enrollment.currentStepIndex + 1 }}</span>
-                  <span v-if="enrollment.mailboxEmail">via {{ enrollment.mailboxEmail }}</span>
-                  <span>Enrolled {{ formatDate(enrollment.enrolledAt) }}</span>
-                  <span v-if="enrollment.nextExecutionAt">
-                    • Next: {{ formatDate(enrollment.nextExecutionAt) }}
-                  </span>
-                </div>
-              </div>
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
 
-      <!-- DEALS -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="text-base">Deals</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div v-if="!deals?.length" class="text-sm text-muted-foreground py-4">
-            No deals linked to this contact yet.
-          </div>
-          <ul v-else class="space-y-2">
-            <li
-              v-for="deal in deals"
-              :key="deal.id"
-              class="flex items-center justify-between p-3 rounded-md border bg-card hover:border-primary cursor-pointer"
-              @click="navigateTo(`/pipelines/${deal.pipelineId}`)"
-            >
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="font-medium truncate">{{ deal.name }}</span>
-                  <Badge variant="outline">{{ deal.stageName }}</Badge>
-                </div>
-                <div class="text-xs text-muted-foreground mt-1 space-x-3">
-                  <span v-if="deal.valueAmount" class="font-medium text-primary">
-                    {{ formatCurrency(deal.valueAmount, deal.valueCurrency) }}
-                  </span>
-                  <span v-if="deal.expectedCloseAt">
-                    Expected close: {{ formatDate(deal.expectedCloseAt) }}
-                  </span>
-                </div>
-              </div>
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
+          <div class="space-y-4 text-sm">
+            <div v-if="contact.emails.length">
+              <p class="text-xs uppercase tracking-wider text-muted-foreground mb-2">Email</p>
+              <ul class="space-y-1.5">
+                <li v-for="email in contact.emails" :key="email.id" class="flex items-center gap-2 flex-wrap">
+                  <Mail class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span>{{ email.email }}</span>
+                  <Badge v-if="email.isPrimary" variant="outline" class="text-xs">Primary</Badge>
+                  <Badge variant="secondary" class="text-xs">{{ email.emailType }}</Badge>
+                </li>
+              </ul>
+            </div>
 
-      <!-- LEAD SCORE HISTORY -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="text-base">Lead Score History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div v-if="!scoreHistory?.length" class="text-sm text-muted-foreground py-4">
-            No score changes yet. Scores update when scoring rules fire or you adjust manually.
+            <div v-if="contact.phones.length">
+              <p class="text-xs uppercase tracking-wider text-muted-foreground mb-2">Phone</p>
+              <ul class="space-y-1.5">
+                <li v-for="phone in contact.phones" :key="phone.id" class="flex items-center gap-2 flex-wrap">
+                  <Phone class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span>{{ phone.phone }}</span>
+                  <Badge v-if="phone.isPrimary" variant="outline" class="text-xs">Primary</Badge>
+                  <Badge variant="secondary" class="text-xs">{{ phone.phoneType }}</Badge>
+                </li>
+              </ul>
+            </div>
+
+            <div v-if="contact.website || contact.linkedinUrl || contact.twitterUrl">
+              <p class="text-xs uppercase tracking-wider text-muted-foreground mb-2">Links</p>
+              <ul class="space-y-1.5">
+                <li v-if="contact.website">
+                  <a :href="contact.website" target="_blank" class="inline-flex items-center gap-2 text-primary hover:underline">
+                    <Globe class="h-3.5 w-3.5" />
+                    Website
+                  </a>
+                </li>
+                <li v-if="contact.linkedinUrl">
+                  <a :href="contact.linkedinUrl" target="_blank" class="inline-flex items-center gap-2 text-primary hover:underline">
+                    <Linkedin class="h-3.5 w-3.5" />
+                    LinkedIn
+                  </a>
+                </li>
+                <li v-if="contact.twitterUrl">
+                  <a :href="contact.twitterUrl" target="_blank" class="inline-flex items-center gap-2 text-primary hover:underline">
+                    <Twitter class="h-3.5 w-3.5" />
+                    Twitter
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div v-if="!contact.emails.length && !contact.phones.length && !contact.website && !contact.linkedinUrl && !contact.twitterUrl" class="text-muted-foreground text-sm">
+              No contact info yet.
+            </div>
           </div>
-          <ul v-else class="space-y-2">
-            <li
-              v-for="log in scoreHistory"
-              :key="log.id"
-              class="flex items-center justify-between p-3 rounded-md border bg-card"
-            >
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <Badge :variant="log.pointsDelta >= 0 ? 'secondary' : 'destructive'" class="font-mono">
-                    {{ log.pointsDelta >= 0 ? '+' : '' }}{{ log.pointsDelta }}
-                  </Badge>
-                  <span class="font-medium text-sm">
-                    {{ log.ruleName ?? 'Manual adjustment' }}
-                  </span>
-                </div>
-                <div class="text-xs text-muted-foreground">
-                  {{ log.reason }}
-                  <span class="ml-2">• {{ log.scoreBefore }} → {{ log.scoreAfter }}</span>
-                </div>
+        </div>
+
+        <!-- Details -->
+        <div class="glass hairline rounded-xl p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <TrendingUp class="h-4 w-4 text-muted-foreground" />
+            <h2 class="text-sm font-semibold tracking-tight">Details</h2>
+          </div>
+
+          <dl class="space-y-3 text-sm">
+            <div class="flex items-center justify-between">
+              <dt class="text-muted-foreground">Lead score</dt>
+              <dd class="flex items-center gap-2">
+                <span class="font-semibold text-base tabular-nums">{{ contact.leadScore }}</span>
+                <Button size="sm" variant="outline" class="h-7 text-xs px-2" @click="adjustDialogOpen = true">
+                  Adjust
+                </Button>
+              </dd>
+            </div>
+            <div class="flex items-center justify-between">
+              <dt class="text-muted-foreground">Source</dt>
+              <dd>{{ contact.source ?? '—' }}</dd>
+            </div>
+            <div class="flex items-center justify-between">
+              <dt class="text-muted-foreground">Last contacted</dt>
+              <dd>{{ formatDate(contact.lastContactedAt) }}</dd>
+            </div>
+            <div class="flex items-center justify-between">
+              <dt class="text-muted-foreground">Created</dt>
+              <dd>{{ formatDate(contact.createdAt) }}</dd>
+            </div>
+            <div class="flex items-center justify-between">
+              <dt class="text-muted-foreground">Updated</dt>
+              <dd>{{ formatDate(contact.updatedAt) }}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+
+      <!-- Sequence enrollments -->
+      <div class="glass hairline rounded-xl overflow-hidden">
+        <div class="flex items-center gap-2 px-6 py-4" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+          <Activity class="h-4 w-4 text-muted-foreground" />
+          <h2 class="text-sm font-semibold tracking-tight">Sequence enrollments</h2>
+        </div>
+        <div v-if="!enrollments?.length" class="px-6 py-10 text-center text-sm text-muted-foreground">
+          Not enrolled in any sequences yet.
+        </div>
+        <ul v-else>
+          <li
+            v-for="enrollment in enrollments"
+            :key="enrollment.id"
+            class="px-6 py-3 cursor-pointer hover:bg-white/5 transition-colors"
+            style="border-top: 1px solid hsl(240 5% 100% / 0.05);"
+            @click="navigateTo(`/sequences/${enrollment.sequenceId}`)"
+          >
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-medium text-sm">{{ enrollment.sequenceName }}</span>
+              <Badge :variant="enrollmentStatusVariant(enrollment.status)">
+                {{ enrollment.status }}
+              </Badge>
+            </div>
+            <div class="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+              <span>Step {{ enrollment.currentStepIndex + 1 }}</span>
+              <span v-if="enrollment.mailboxEmail">via {{ enrollment.mailboxEmail }}</span>
+              <span>Enrolled {{ formatDate(enrollment.enrolledAt) }}</span>
+              <span v-if="enrollment.nextExecutionAt">
+                Next: {{ formatDate(enrollment.nextExecutionAt) }}
+              </span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Deals -->
+      <div class="glass hairline rounded-xl overflow-hidden">
+        <div class="flex items-center gap-2 px-6 py-4" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+          <Briefcase class="h-4 w-4 text-muted-foreground" />
+          <h2 class="text-sm font-semibold tracking-tight">Deals</h2>
+        </div>
+        <div v-if="!deals?.length" class="px-6 py-10 text-center text-sm text-muted-foreground">
+          No deals linked to this contact yet.
+        </div>
+        <ul v-else>
+          <li
+            v-for="deal in deals"
+            :key="deal.id"
+            class="px-6 py-3 cursor-pointer hover:bg-white/5 transition-colors"
+            style="border-top: 1px solid hsl(240 5% 100% / 0.05);"
+            @click="navigateTo(`/pipelines/${deal.pipelineId}`)"
+          >
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-medium text-sm truncate">{{ deal.name }}</span>
+              <Badge variant="outline">{{ deal.stageName }}</Badge>
+            </div>
+            <div class="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+              <span v-if="deal.valueAmount" class="font-medium text-primary tabular-nums">
+                {{ formatCurrency(deal.valueAmount, deal.valueCurrency) }}
+              </span>
+              <span v-if="deal.expectedCloseAt">
+                Expected close: {{ formatDate(deal.expectedCloseAt) }}
+              </span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Lead score history -->
+      <div class="glass hairline rounded-xl overflow-hidden">
+        <div class="flex items-center gap-2 px-6 py-4" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+          <History class="h-4 w-4 text-muted-foreground" />
+          <h2 class="text-sm font-semibold tracking-tight">Lead score history</h2>
+        </div>
+        <div v-if="!scoreHistory?.length" class="px-6 py-10 text-center text-sm text-muted-foreground">
+          No score changes yet. Scores update when rules fire or you adjust manually.
+        </div>
+        <ul v-else>
+          <li
+            v-for="log in scoreHistory"
+            :key="log.id"
+            class="px-6 py-3 flex items-start justify-between gap-4"
+            style="border-top: 1px solid hsl(240 5% 100% / 0.05);"
+          >
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <Badge :variant="log.pointsDelta >= 0 ? 'secondary' : 'destructive'" class="font-mono tabular-nums">
+                  {{ log.pointsDelta >= 0 ? '+' : '' }}{{ log.pointsDelta }}
+                </Badge>
+                <span class="font-medium text-sm">
+                  {{ log.ruleName ?? 'Manual adjustment' }}
+                </span>
               </div>
-              <time class="text-xs text-muted-foreground whitespace-nowrap ml-4">
-                {{ formatDate(log.createdAt) }}
-              </time>
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
+              <div class="text-xs text-muted-foreground">
+                <span v-if="log.reason">{{ log.reason }} · </span>
+                <span class="tabular-nums">{{ log.scoreBefore }} → {{ log.scoreAfter }}</span>
+              </div>
+            </div>
+            <time class="text-xs text-muted-foreground whitespace-nowrap">
+              {{ formatDate(log.createdAt) }}
+            </time>
+          </li>
+        </ul>
+      </div>
 
       <!-- Adjust score dialog -->
       <Dialog v-model:open="adjustDialogOpen">
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Adjust score manually</DialogTitle>
+            <DialogTitle>Adjust score</DialogTitle>
             <DialogDescription>
-              Add or subtract points. Use negative numbers to deduct.
+              Add or subtract points. Use a negative number to deduct.
             </DialogDescription>
           </DialogHeader>
-          <div class="space-y-3">
+          <div class="space-y-4">
             <div class="space-y-2">
-              <Label for="adjustPoints">Points delta *</Label>
-              <input
+              <Label for="adjustPoints">Points</Label>
+              <Input
                 id="adjustPoints"
                 v-model.number="adjustPoints"
                 type="number"
-                class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
               />
             </div>
             <div class="space-y-2">
               <Label for="adjustReason">Reason</Label>
-              <input
+              <Input
                 id="adjustReason"
                 v-model="adjustReason"
                 type="text"
-                placeholder="e.g., attended webinar"
-                class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                placeholder="e.g. attended webinar"
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" @click="adjustDialogOpen = false">Cancel</Button>
             <Button @click="handleAdjustScore" :disabled="adjustScoreMutation.isPending.value">
-              Apply
+              {{ adjustScoreMutation.isPending.value ? 'Applying…' : 'Apply' }}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <!-- ACTIVITY TIMELINE -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="text-base">Activity Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div v-if="!timeline?.length" class="text-sm text-muted-foreground py-4">
-            No activity yet. Activity will appear here as emails are sent, opened, and clicked.
-          </div>
-          <ol v-else class="relative border-l border-muted ml-3 space-y-4 py-2">
-            <li v-for="event in timeline" :key="event.id + event.type + event.occurredAt" class="ml-6">
-              <span class="absolute -left-3 flex items-center justify-center w-6 h-6 bg-card border rounded-full">
-                <span class="text-xs">{{ eventIcon(event.type) }}</span>
+      <!-- Activity timeline -->
+      <div class="glass hairline rounded-xl overflow-hidden">
+        <div class="flex items-center gap-2 px-6 py-4" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+          <Clock class="h-4 w-4 text-muted-foreground" />
+          <h2 class="text-sm font-semibold tracking-tight">Activity timeline</h2>
+        </div>
+        <div v-if="!timeline?.length" class="px-6 py-10 text-center text-sm text-muted-foreground">
+          No activity yet. Emails sent, opened, and clicked will appear here.
+        </div>
+        <ol v-else class="px-6 py-5 space-y-5">
+          <li
+            v-for="(event, idx) in timeline"
+            :key="event.id + event.type + event.occurredAt"
+            class="relative flex gap-4"
+          >
+            <div class="relative shrink-0">
+              <span class="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center">
+                <component :is="eventIconComponent(event.type)" class="h-4 w-4 text-muted-foreground" />
               </span>
+              <span
+                v-if="idx < timeline.length - 1"
+                class="absolute left-1/2 -translate-x-1/2 top-8 w-px h-[calc(100%+1.25rem)]"
+                style="background: hsl(240 5% 100% / 0.08);"
+              />
+            </div>
+            <div class="flex-1 min-w-0 pb-1">
               <div class="flex items-start justify-between gap-4">
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium">{{ event.title }}</p>
-                  <p v-if="event.description" class="text-xs text-muted-foreground">
-                    {{ event.description }}
-                  </p>
-                </div>
+                <p class="text-sm font-medium">{{ event.title }}</p>
                 <time class="text-xs text-muted-foreground whitespace-nowrap">
                   {{ formatDateString(event.occurredAt) }}
                 </time>
               </div>
-            </li>
-          </ol>
-        </CardContent>
-      </Card>
+              <p v-if="event.description" class="text-xs text-muted-foreground mt-0.5">
+                {{ event.description }}
+              </p>
+            </div>
+          </li>
+        </ol>
+      </div>
     </div>
   </div>
 </template>

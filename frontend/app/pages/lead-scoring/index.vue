@@ -104,7 +104,12 @@ async function handleSave() {
 }
 
 async function handleDelete(rule: LeadScoreRuleEntity) {
-  if (!confirm(`Delete rule "${rule.name}"?`)) return
+  const ok = await useConfirm().ask({
+    title: `Delete rule "${rule.name}"?`,
+    confirmLabel: 'Delete',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await deleteMutation.mutateAsync(rule.id)
     toast.success('Rule deleted')
@@ -134,7 +139,12 @@ async function handleToggle(rule: LeadScoreRuleEntity) {
 }
 
 async function handleRecalculate() {
-  if (!confirm('This will reset every contact\'s score to zero and replay CONTACT_CREATED rules. Continue?')) return
+  const ok = await useConfirm().ask({
+    title: 'Recalculate every lead score?',
+    description: 'Every contact will have their score reset to zero and CONTACT_CREATED rules replayed. This may take a while on large workspaces.',
+    confirmLabel: 'Recalculate',
+  })
+  if (!ok) return
   try {
     const result = await recalcMutation.mutateAsync()
     toast.success(`Recalculated ${result.contactsProcessed} contacts`)

@@ -9,10 +9,11 @@ const props = defineProps<{ class?: HTMLAttributes["class"] }>()
   <div
     :class="
       cn(
-        'flex flex-col-reverse sm:flex-row sm:justify-end sm:gap-x-2',
+        'flex flex-col-reverse sm:flex-row sm:justify-end sm:gap-x-2 mt-6 pt-4',
         props.class,
       )
     "
+    style="border-top: 1px solid hsl(240 5% 100% / 0.06);"
   >
     <slot />
   </div>

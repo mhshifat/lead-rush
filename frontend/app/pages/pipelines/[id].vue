@@ -140,7 +140,12 @@ async function handleCreateDeal() {
 }
 
 async function handleDeleteDeal(dealId: string, name: string) {
-  if (!confirm(`Delete deal "${name}"?`)) return
+  const ok = await useConfirm().ask({
+    title: `Delete deal "${name}"?`,
+    confirmLabel: 'Delete',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await deleteDealMutation.mutateAsync(dealId)
     toast.success('Deal deleted')

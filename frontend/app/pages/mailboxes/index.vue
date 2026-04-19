@@ -117,7 +117,13 @@ async function handleTest(id: string) {
 }
 
 async function handleDelete(id: string, email: string) {
-  if (!confirm(`Remove mailbox "${email}"? This won't send more emails.`)) return
+  const ok = await useConfirm().ask({
+    title: `Remove mailbox "${email}"?`,
+    description: "The mailbox will stop sending emails immediately.",
+    confirmLabel: 'Remove',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await deleteMutation.mutateAsync(id)
     toast.success('Mailbox removed')

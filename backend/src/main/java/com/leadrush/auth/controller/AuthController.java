@@ -80,6 +80,14 @@ public class AuthController {
         return ApiResponse.success(response);
     }
 
+    // Returns the current user + workspace list. Frontend calls this on boot to
+    // rehydrate state after a page refresh (Pinia is in-memory only).
+    @GetMapping("/me")
+    public ApiResponse<AuthResponse> me() {
+        AuthResponse response = authService.me(TenantContext.getUserId());
+        return ApiResponse.success(response);
+    }
+
     /**
      * POST /api/v1/auth/switch-workspace
      *

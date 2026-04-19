@@ -156,6 +156,40 @@ public class AuthService {
         log.info("Activation email resent for: {}", email);
     }
 
+    // Returns the signed-in user's profile + workspace memberships without issuing new tokens.
+    // Used by the frontend to rehydrate state after a page refresh.
+    @Transactional(readOnly = true)
+    public AuthResponse me(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        List<WorkspaceMembership> memberships = membershipRepository.findByUserId(userId);
+        List<AuthResponse.WorkspaceDto> workspaceDtos = memberships.stream()
+                .map(m -> {
+                    Workspace ws = workspaceRepository.findById(m.getWorkspaceId()).orElse(null);
+                    if (ws == null) return null;
+                    return AuthResponse.WorkspaceDto.builder()
+                            .id(ws.getId()).name(ws.getName()).slug(ws.getSlug())
+                            .logoUrl(ws.getLogoUrl()).role(m.getRole().name())
+                            .build();
+                })
+                .filter(dto -> dto != null)
+                .toList();
+
+        return AuthResponse.builder()
+                .accessToken(null)
+                .refreshToken(null)
+                .user(AuthResponse.UserDto.builder()
+                        .id(user.getId()).email(user.getEmail()).name(user.getName())
+                        .avatarUrl(user.getAvatarUrl()).hasPassword(user.hasPassword())
+                        .primaryProvider(user.getPrimaryProvider().name())
+                        .lastUsedProvider(user.getLastUsedProvider() != null
+                                ? user.getLastUsedProvider().name() : null)
+                        .build())
+                .workspaces(workspaceDtos)
+                .build();
+    }
+
     // Re-issues access token for a different workspace; refresh token is not rotated.
     @Transactional
     public AuthResponse switchWorkspace(UUID userId, UUID targetWorkspaceId) {

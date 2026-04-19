@@ -45,6 +45,11 @@ export default defineNuxtConfig({
     apiBaseUrlServer: process.env.NUXT_API_BASE_URL_SERVER || '',
     public: {
       apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1',
+      // Cookie lifetimes in seconds. Must match (or exceed) the backend JWT
+      // expiries or the user gets logged out before the token itself expires.
+      // Defaults: 24h access / 30d refresh.
+      accessTokenTtl: Number(process.env.NUXT_PUBLIC_ACCESS_TOKEN_TTL ?? 60 * 60 * 24),
+      refreshTokenTtl: Number(process.env.NUXT_PUBLIC_REFRESH_TOKEN_TTL ?? 60 * 60 * 24 * 30),
     },
   },
 

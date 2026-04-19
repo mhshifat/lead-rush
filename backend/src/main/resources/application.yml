@@ -77,8 +77,8 @@ spring:
 leadrush:
   jwt:
     secret: ${JWT_SECRET:my-super-secret-key-for-dev-only-change-in-production-min-32-chars}
-    access-token-expiry: ${JWT_ACCESS_EXPIRY:900000}        # 15 minutes in ms
-    refresh-token-expiry: ${JWT_REFRESH_EXPIRY:604800000}   # 7 days in ms
+    access-token-expiry: ${JWT_ACCESS_EXPIRY:86400000}         # 24 hours in ms
+    refresh-token-expiry: ${JWT_REFRESH_EXPIRY:2592000000}     # 30 days in ms
   frontend-url: ${FRONTEND_URL:http://localhost:3001}
   encryption-key: ${ENCRYPTION_KEY:dev-encryption-key-change-in-prod}
   email:

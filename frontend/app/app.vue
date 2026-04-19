@@ -6,6 +6,7 @@
     </NuxtLayout>
 
     <Toaster position="bottom-right" :duration="5000" />
+    <SharedConfirmDialog />
   </div>
 </template>
 

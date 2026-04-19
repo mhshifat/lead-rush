@@ -81,7 +81,13 @@ async function handleRoleChange(member: MemberEntity, role: WorkspaceRole) {
 }
 
 async function handleRemove(member: MemberEntity) {
-  if (!confirm(`Remove ${member.name} from the workspace?`)) return
+  const ok = await useConfirm().ask({
+    title: `Remove ${member.name}?`,
+    description: 'They will lose access to this workspace immediately.',
+    confirmLabel: 'Remove',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await removeMutation.mutateAsync(member.membershipId)
     toast.success(`${member.name} removed`)
@@ -91,7 +97,12 @@ async function handleRemove(member: MemberEntity) {
 }
 
 async function handleRevoke(inv: InvitationEntity) {
-  if (!confirm(`Revoke invitation to ${inv.email}?`)) return
+  const ok = await useConfirm().ask({
+    title: `Revoke invitation to ${inv.email}?`,
+    confirmLabel: 'Revoke',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await revokeMutation.mutateAsync(inv.id)
     toast.success('Invitation revoked')

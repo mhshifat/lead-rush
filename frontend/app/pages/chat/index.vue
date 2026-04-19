@@ -85,7 +85,11 @@ async function handleSend() {
 
 async function handleClose() {
   if (!selectedId.value) return
-  if (!confirm('Close this conversation?')) return
+  const ok = await useConfirm().ask({
+    title: 'Close this conversation?',
+    confirmLabel: 'Close',
+  })
+  if (!ok) return
   try {
     await closeMutation.mutateAsync(selectedId.value)
     toast.success('Conversation closed')

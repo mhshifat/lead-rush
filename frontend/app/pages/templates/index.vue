@@ -138,7 +138,12 @@ async function handleSave() {
 }
 
 async function handleDelete(id: string, name: string) {
-  if (!confirm(`Delete template "${name}"?`)) return
+  const ok = await useConfirm().ask({
+    title: `Delete template "${name}"?`,
+    confirmLabel: 'Delete',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await deleteMutation.mutateAsync(id)
     toast.success('Template deleted')

@@ -105,7 +105,12 @@ async function handleSave() {
 }
 
 async function handleDelete(endpoint: WebhookEndpointApiDto) {
-  if (!confirm(`Delete webhook for ${endpoint.url}?`)) return
+  const ok = await useConfirm().ask({
+    title: `Delete webhook for ${endpoint.url}?`,
+    confirmLabel: 'Delete',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await deleteMutation.mutateAsync(endpoint.id)
     toast.success('Deleted')
@@ -116,7 +121,12 @@ async function handleDelete(endpoint: WebhookEndpointApiDto) {
 }
 
 async function handleRotate(endpoint: WebhookEndpointApiDto) {
-  if (!confirm('Rotate the signing secret? The old secret will stop working immediately.')) return
+  const ok = await useConfirm().ask({
+    title: 'Rotate the signing secret?',
+    description: 'The old secret will stop working immediately. Update your receiving service with the new secret right after.',
+    confirmLabel: 'Rotate',
+  })
+  if (!ok) return
   try {
     const updated = await rotateMutation.mutateAsync(endpoint.id)
     revealedSecret.value = updated.secret ?? ''

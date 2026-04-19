@@ -37,7 +37,12 @@ async function handleComplete(id: string, title: string) {
 }
 
 async function handleDelete(id: string, title: string) {
-  if (!confirm(`Delete task "${title}"?`)) return
+  const ok = await useConfirm().ask({
+    title: `Delete task "${title}"?`,
+    confirmLabel: 'Delete',
+    variant: 'destructive',
+  })
+  if (!ok) return
   try {
     await deleteMutation.mutateAsync(id)
     toast.success('Task deleted')
