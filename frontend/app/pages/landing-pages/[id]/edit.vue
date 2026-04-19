@@ -1551,8 +1551,8 @@ function publicUrl(): string {
                           class="h-8 text-xs flex-1"
                           placeholder="Feature"
                           :model-value="feat"
-                          @update:model-value="(v: string) => {
-                            const feats = [...plan.features]; feats[fi] = v;
+                          @update:model-value="(v) => {
+                            const feats = [...plan.features]; feats[fi] = String(v ?? '');
                             updateItemAt('plans', idx, { features: feats })
                           }"
                         />
@@ -1576,7 +1576,7 @@ function publicUrl(): string {
                       </button>
                     </div>
                     <label class="flex items-center gap-2 cursor-pointer select-none pt-1">
-                      <Checkbox :model-value="plan.featured" @update:model-value="(v: boolean) => updateItemAt('plans', idx, { featured: v })" />
+                      <Checkbox :model-value="plan.featured" @update:model-value="(v) => updateItemAt('plans', idx, { featured: v === true })" />
                       <span class="text-xs">Featured plan</span>
                     </label>
                   </div>
