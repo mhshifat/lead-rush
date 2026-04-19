@@ -1,14 +1,16 @@
-<!--
-  Landing pages list — create new, see stats, click to edit.
--->
 <script setup lang="ts">
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Badge } from '~/components/ui/badge'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '~/components/ui/dialog'
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription,
+} from '~/components/ui/dialog'
 import { toast } from 'vue-sonner'
+import {
+  Plus, LayoutTemplate, Eye, UserCheck, TrendingUp,
+  ArrowUpRight, Pencil, Globe, EyeOff, Trash2,
+} from 'lucide-vue-next'
 
 definePageMeta({
   middleware: 'auth',
@@ -81,22 +83,59 @@ function publicUrl(slug: string): string {
   }
   return `/p/${slug}`
 }
+
+// Coloured status dot on the card's icon tile — doubles as an at-a-glance health signal.
+function statusAccent(status: string): string {
+  switch (status) {
+    case 'PUBLISHED': return 'bg-emerald-400'
+    case 'DRAFT':     return 'bg-muted-foreground/50'
+    default:          return 'bg-muted-foreground/50'
+  }
+}
+
+function statusBadgeVariant(status: string): 'default' | 'secondary' | 'outline' {
+  return status === 'PUBLISHED' ? 'default' : 'secondary'
+}
+
+// Totals strip above the grid.
+const totals = computed(() => {
+  const list = pages.value ?? []
+  const published = list.filter(p => p.status === 'PUBLISHED').length
+  const views = list.reduce((a, p) => a + (p.viewCount ?? 0), 0)
+  const conversions = list.reduce((a, p) => a + (p.conversionCount ?? 0), 0)
+  return {
+    total: list.length,
+    published,
+    views,
+    conversions,
+    rate: views === 0 ? '—' : ((conversions / views) * 100).toFixed(1) + '%',
+  }
+})
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-center justify-between">
+  <div class="space-y-5 enter-fade-up">
+    <!-- Header -->
+    <div class="flex items-end justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold">Landing Pages</h1>
-        <p class="text-sm text-muted-foreground">Create block-based pages to capture leads.</p>
+        <h1 class="text-2xl font-semibold tracking-tight">Landing pages</h1>
+        <p class="text-sm text-muted-foreground mt-0.5">
+          Block-based pages to capture leads — publishable, shareable, trackable.
+        </p>
       </div>
       <Dialog v-model:open="dialogOpen">
         <DialogTrigger as-child>
-          <Button>+ New Page</Button>
+          <Button class="gap-1.5">
+            <Plus class="h-4 w-4" />
+            New page
+          </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Landing Page</DialogTitle>
+            <DialogTitle>Create landing page</DialogTitle>
+            <DialogDescription>
+              Starts as a DRAFT — add blocks, then publish when ready.
+            </DialogDescription>
           </DialogHeader>
           <div class="space-y-4">
             <div
@@ -110,92 +149,181 @@ function publicUrl(slug: string): string {
               <Input
                 id="name"
                 v-model="form.name"
-                placeholder="Q2 Campaign Landing"
+                placeholder="Q2 campaign landing"
                 :class="createErrors.has('name') ? 'border-destructive' : ''"
               />
               <SharedFormError :message="createErrors.get('name')" />
             </div>
             <div class="space-y-2">
-              <Label for="metaTitle">Meta Title (SEO)</Label>
+              <Label for="metaTitle">Meta title <span class="text-muted-foreground font-normal">(SEO)</span></Label>
               <Input id="metaTitle" v-model="form.metaTitle" placeholder="Get 20% off this quarter" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" @click="dialogOpen = false">Cancel</Button>
             <Button @click="handleCreate" :disabled="createMutation.isPending.value">
-              {{ createMutation.isPending.value ? 'Creating...' : 'Create & Edit' }}
+              {{ createMutation.isPending.value ? 'Creating…' : 'Create & edit' }}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
 
-    <div v-if="isLoading" class="text-center py-8 text-muted-foreground">Loading...</div>
-
-    <div v-else-if="!pages?.length" class="text-center py-12 text-muted-foreground">
-      No pages yet. Create your first landing page to start capturing leads.
+    <!-- Summary strip (only when there are pages) -->
+    <div
+      v-if="pages?.length"
+      class="glass hairline rounded-xl grid grid-cols-2 md:grid-cols-4 divide-x divide-white/5"
+    >
+      <div class="p-4">
+        <p class="text-xs text-muted-foreground">Pages</p>
+        <p class="mt-1 text-xl font-semibold tabular-nums">{{ totals.total }}</p>
+      </div>
+      <div class="p-4">
+        <p class="text-xs text-muted-foreground">Published</p>
+        <p class="mt-1 text-xl font-semibold tabular-nums">{{ totals.published }}</p>
+      </div>
+      <div class="p-4">
+        <p class="text-xs text-muted-foreground">Total views</p>
+        <p class="mt-1 text-xl font-semibold tabular-nums">{{ totals.views }}</p>
+      </div>
+      <div class="p-4">
+        <p class="text-xs text-muted-foreground">Avg conversion</p>
+        <p class="mt-1 text-xl font-semibold tabular-nums">{{ totals.rate }}</p>
+      </div>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <Card v-for="page in pages" :key="page.id">
-        <CardHeader>
-          <div class="flex items-start justify-between">
-            <div class="flex-1 min-w-0">
-              <CardTitle class="text-base truncate">{{ page.name }}</CardTitle>
-              <CardDescription class="font-mono text-xs truncate">/p/{{ page.slug }}</CardDescription>
-            </div>
-            <Badge :variant="page.status === 'PUBLISHED' ? 'default' : 'secondary'">
-              {{ page.status }}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent class="space-y-3">
-          <div class="grid grid-cols-3 gap-2 text-sm">
-            <div>
-              <div class="text-xs text-muted-foreground">Views</div>
-              <div class="font-medium">{{ page.viewCount }}</div>
-            </div>
-            <div>
-              <div class="text-xs text-muted-foreground">Submits</div>
-              <div class="font-medium">{{ page.conversionCount }}</div>
-            </div>
-            <div>
-              <div class="text-xs text-muted-foreground">Rate</div>
-              <div class="font-medium">{{ conversionRate(page.viewCount, page.conversionCount) }}</div>
-            </div>
-          </div>
+    <!-- Loading -->
+    <div
+      v-if="isLoading"
+      class="glass hairline rounded-xl py-16 text-center text-sm text-muted-foreground"
+    >
+      Loading pages…
+    </div>
 
-          <div class="flex gap-2 pt-2">
-            <Button size="sm" variant="outline" class="flex-1" @click="navigateTo(`/landing-pages/${page.id}/edit`)">
-              Edit
-            </Button>
-            <Button
-              size="sm"
-              :variant="page.status === 'PUBLISHED' ? 'outline' : 'default'"
-              class="flex-1"
-              @click="handleTogglePublish(page.id, page.status)"
-              :disabled="publishMutation.isPending.value"
-            >
-              {{ page.status === 'PUBLISHED' ? 'Unpublish' : 'Publish' }}
-            </Button>
-          </div>
+    <!-- Empty state -->
+    <div
+      v-else-if="!pages?.length"
+      class="glass hairline rounded-xl py-14 px-6 text-center"
+    >
+      <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+        <LayoutTemplate class="h-5 w-5 text-muted-foreground" />
+      </div>
+      <h3 class="text-sm font-semibold tracking-tight">No landing pages yet</h3>
+      <p class="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+        Assemble hero, form, pricing, and more blocks — then publish to share a public URL.
+      </p>
+      <Button class="mt-5 gap-1.5" @click="dialogOpen = true">
+        <Plus class="h-4 w-4" />
+        New page
+      </Button>
+    </div>
 
-          <div class="flex gap-2">
-            <a
-              v-if="page.status === 'PUBLISHED'"
-              :href="publicUrl(page.slug)"
-              target="_blank"
-              class="flex-1 text-center text-xs text-primary hover:underline"
-            >
-              Open public page ↗
-            </a>
-            <button
-              class="text-xs text-muted-foreground hover:text-destructive"
-              @click="handleDelete(page.id, page.name)"
-            >✕ Delete</button>
+    <!-- Grid of page cards -->
+    <div
+      v-else
+      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+    >
+      <div
+        v-for="page in pages"
+        :key="page.id"
+        class="group glass hairline rounded-xl p-5 transition-colors hover:bg-white/2 flex flex-col"
+      >
+        <!-- Header row: icon + name/slug + status badge -->
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-start gap-3 min-w-0">
+            <div class="relative h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+              <LayoutTemplate class="h-4 w-4 text-primary" />
+              <span
+                class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-background"
+                :class="statusAccent(page.status)"
+              />
+            </div>
+            <div class="min-w-0">
+              <h3 class="font-semibold tracking-tight truncate">{{ page.name }}</h3>
+              <p class="text-xs text-muted-foreground font-mono truncate">/p/{{ page.slug }}</p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <Badge :variant="statusBadgeVariant(page.status)" class="text-xs shrink-0">
+            {{ page.status }}
+          </Badge>
+        </div>
+
+        <!-- Metrics strip -->
+        <div
+          class="mt-4 grid grid-cols-3 gap-3 pt-4"
+          style="border-top: 1px solid hsl(240 5% 100% / 0.05);"
+        >
+          <div class="flex items-center gap-2">
+            <Eye class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <div class="min-w-0">
+              <p class="text-xs text-muted-foreground">Views</p>
+              <p class="text-sm font-semibold tabular-nums">{{ page.viewCount }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <UserCheck class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <div class="min-w-0">
+              <p class="text-xs text-muted-foreground">Submits</p>
+              <p class="text-sm font-semibold tabular-nums">{{ page.conversionCount }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <TrendingUp class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <div class="min-w-0">
+              <p class="text-xs text-muted-foreground">Rate</p>
+              <p class="text-sm font-semibold tabular-nums">{{ conversionRate(page.viewCount, page.conversionCount) }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="mt-4 flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            class="flex-1 gap-1.5"
+            @click="navigateTo(`/landing-pages/${page.id}/edit`)"
+          >
+            <Pencil class="h-3.5 w-3.5" />
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            class="flex-1 gap-1.5"
+            :variant="page.status === 'PUBLISHED' ? 'outline' : 'default'"
+            :disabled="publishMutation.isPending.value"
+            @click="handleTogglePublish(page.id, page.status)"
+          >
+            <component :is="page.status === 'PUBLISHED' ? EyeOff : Globe" class="h-3.5 w-3.5" />
+            {{ page.status === 'PUBLISHED' ? 'Unpublish' : 'Publish' }}
+          </Button>
+        </div>
+
+        <!-- Footer row: public link + delete -->
+        <div
+          class="mt-3 pt-3 flex items-center justify-between text-xs"
+          style="border-top: 1px solid hsl(240 5% 100% / 0.05);"
+        >
+          <a
+            v-if="page.status === 'PUBLISHED'"
+            :href="publicUrl(page.slug)"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 text-primary hover:underline"
+          >
+            View live
+            <ArrowUpRight class="h-3 w-3" />
+          </a>
+          <span v-else class="text-muted-foreground">Draft — not yet public</span>
+          <button
+            class="inline-flex items-center gap-1 text-muted-foreground hover:text-destructive transition-colors"
+            @click="handleDelete(page.id, page.name)"
+          >
+            <Trash2 class="h-3 w-3" />
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
