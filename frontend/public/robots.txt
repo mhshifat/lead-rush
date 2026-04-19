@@ -19,7 +19,6 @@ Disallow: /forms
 Disallow: /enrichment
 Disallow: /lead-scoring
 Disallow: /analytics
-Disallow: /chat
 Disallow: /tasks
 Disallow: /notifications
 Disallow: /settings

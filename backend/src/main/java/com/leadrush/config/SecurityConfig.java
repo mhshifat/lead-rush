@@ -47,8 +47,7 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/actuator/health",
                     "/ws/**",
-                    "/ws-public/**",
-                    "/widget.js"
+                    "/ws-public/**"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

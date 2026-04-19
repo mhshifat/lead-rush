@@ -1,6 +1,6 @@
 # Lead Rush
 
-All-in-one lead generation platform: contacts & companies, email sequences, landing pages, live chat, CRM pipeline, enrichment, and AI-assisted outreach — delivered as a multi-tenant SaaS.
+All-in-one lead generation platform: contacts & companies, email sequences, landing pages, CRM pipeline, enrichment, and AI-assisted outreach — delivered as a multi-tenant SaaS.
 
 ## Monorepo layout
 
@@ -9,7 +9,6 @@ All-in-one lead generation platform: contacts & companies, email sequences, land
 | [`backend/`](backend/) | Java 21, Spring Boot 3.5, PostgreSQL 16 + pgvector, Redis | REST API, WebSocket (STOMP), scheduled jobs, auth |
 | [`frontend/`](frontend/) | Nuxt 3, Vue 3, Tailwind CSS v4, Pinia, TanStack Query | Web app (SSR) |
 | [`extension/`](extension/) | WXT, React, TypeScript | Browser extension — LinkedIn profile import |
-| [`widget/`](widget/) | Vite, TypeScript | Embeddable chat widget (`widget.js`) |
 
 ## Running the stack
 
@@ -58,4 +57,3 @@ Key env vars: `DATABASE_URL`, `REDIS_URL`, `SMTP_HOST`, `JWT_SECRET`, `ENCRYPTIO
 - [`backend/README.md`](backend/README.md) — Spring Boot specifics, migrations, testing
 - [`frontend/README.md`](frontend/README.md) — Nuxt setup, API wiring, component library
 - [`extension/README.md`](extension/README.md) — installing the dev build in Chrome/Firefox
-- [`widget/README.md`](widget/README.md) — embedding on a customer site

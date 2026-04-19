@@ -26,7 +26,6 @@ const navItems: NavItem[] = [
   { label: 'Enrichment',    path: '/enrichment',    icon: 'M12 3l3 7h7l-5.5 4 2 7L12 17l-6.5 4 2-7L2 10h7l3-7z' },
   { label: 'Lead Scoring',  path: '/lead-scoring',  icon: 'M12 2v20M2 12h20M5 5l14 14M19 5L5 19' },
   { label: 'Analytics',     path: '/analytics',     icon: 'M4 19V5m6 14V9m6 10v-6m6 6V13' },
-  { label: 'Chat',          path: '/chat',          icon: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z' },
   { label: 'Tasks',         path: '/tasks',         icon: 'M9 11l3 3L22 4m-6 11v4a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h8' },
   { label: 'Team',          path: '/settings/team', icon: 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6 5.87V14a4 4 0 00-8 0v.13M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
 ]

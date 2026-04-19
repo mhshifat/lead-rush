@@ -34,9 +34,6 @@ public enum WebhookEventType {
 
     EMAIL_REPLIED("email.replied"),
 
-    CHAT_CONVERSATION_STARTED("chat.conversation.started"),
-    CHAT_MESSAGE_RECEIVED("chat.message.received"),
-
     TEST("test.ping");
 
     private final String topic;
