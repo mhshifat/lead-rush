@@ -4,8 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
 
@@ -15,9 +15,12 @@ public class CorsConfig {
 
     private final LeadRushProperties properties;
 
+    // Spring Security's .cors(...) picks this up automatically, which plugs the
+    // CORS filter in BEFORE the auth checks — so preflight OPTIONS requests
+    // on authenticated endpoints don't get 403'd (no CORS headers on a 403
+    // shows up as a generic "CORS error" in the browser).
     @Bean
-    public CorsFilter corsFilter() {
-        // Authenticated surface: only the configured frontend origin.
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration app = new CorsConfiguration();
         app.setAllowedOrigins(List.of(properties.getFrontendUrl()));
         app.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
@@ -37,6 +40,6 @@ public class CorsConfig {
         source.registerCorsConfiguration("/api/v1/public/**", publicCors);
         source.registerCorsConfiguration("/widget.js", publicCors);
         source.registerCorsConfiguration("/**", app);
-        return new CorsFilter(source);
+        return source;
     }
 }

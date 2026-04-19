@@ -39,6 +39,12 @@ public class TransactionalEmailService {
     @Value("${spring.mail.password:}")
     private String smtpPassword;
 
+    @Value("${spring.mail.properties.mail.smtp.auth:true}")
+    private boolean smtpAuth;
+
+    @Value("${spring.mail.properties.mail.smtp.starttls.enable:true}")
+    private boolean smtpStartTls;
+
     @Value("${leadrush.email.from-address:noreply@leadrush.local}")
     private String fromAddress;
 
@@ -92,7 +98,7 @@ public class TransactionalEmailService {
         }
 
         var credentials = new EmailSenderAdapter.SmtpCredentials(
-                smtpHost, smtpPort, smtpUsername, smtpPassword);
+                smtpHost, smtpPort, smtpUsername, smtpPassword, smtpStartTls, smtpAuth);
 
         var request = new EmailSenderAdapter.SendRequest(
                 credentials, fromAddress, fromName, to, subject, bodyHtml, bodyText);
@@ -103,6 +109,8 @@ public class TransactionalEmailService {
             log.info("Transactional email sent to {}: {}", to, subject);
         } else {
             log.warn("Failed to send transactional email to {}: {}", to, result.errorMessage());
+            throw new com.leadrush.common.exception.BusinessException(
+                    "Could not send email. Please try again in a moment.");
         }
     }
 

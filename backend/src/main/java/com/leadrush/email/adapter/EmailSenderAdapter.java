@@ -46,8 +46,15 @@ public interface EmailSenderAdapter {
         String host,
         int port,
         String username,
-        String password
-    ) {}
+        String password,
+        boolean useStartTls,
+        boolean requireAuth
+    ) {
+        // Sensible default for real mail providers (Gmail, Outlook, SES).
+        public SmtpCredentials(String host, int port, String username, String password) {
+            this(host, port, username, password, true, true);
+        }
+    }
 
     record SendResult(
         boolean success,

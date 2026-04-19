@@ -5,6 +5,7 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Badge } from '~/components/ui/badge'
+import { Eye, EyeOff } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'auth',
@@ -16,6 +17,7 @@ const route = useRoute()
 
 const email = ref('')
 const password = ref('')
+const showPassword = ref(false)
 const isLoading = ref(false)
 const errorMessage = ref('')
 
@@ -130,14 +132,26 @@ async function handleSubmit() {
               Forgot password?
             </NuxtLink>
           </div>
-          <Input
-            id="password"
-            v-model="password"
-            type="password"
-            placeholder="Enter your password"
-            required
-            autocomplete="current-password"
-          />
+          <div class="relative">
+            <Input
+              id="password"
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="Enter your password"
+              required
+              autocomplete="current-password"
+              class="pr-10"
+            />
+            <button
+              type="button"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              @click="showPassword = !showPassword"
+            >
+              <EyeOff v-if="showPassword" class="h-4 w-4" />
+              <Eye v-else class="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <Button type="submit" class="w-full" :disabled="isLoading">

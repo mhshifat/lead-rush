@@ -93,11 +93,15 @@ springdoc:
     path: /swagger-ui.html
 
 # ── Logging ──
+# Flip any of the below to DEBUG when diagnosing specific areas:
+#   org.hibernate.SQL       → show every executed SQL statement
+#   org.hibernate.orm.jdbc.bind → also show bound parameter values
+#   org.springframework.security → filter-chain decisions per request
 logging:
   level:
     com.leadrush: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.springframework.security: DEBUG
+    org.hibernate.SQL: WARN
+    org.springframework.security: WARN
 
 # ── Server ──
 server:

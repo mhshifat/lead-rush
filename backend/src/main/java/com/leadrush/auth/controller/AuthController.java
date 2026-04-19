@@ -49,19 +49,12 @@ public class AuthController {
         return ApiResponse.success(response);
     }
 
-    /**
-     * GET /api/v1/auth/verify-email?token=xxx
-     *
-     * Activates the user's account. Called when they click the email link.
-     * Redirects to the frontend login page with ?activated=true.
-     */
+    // Called by the frontend verify-email page (which owns the token from the email link).
+    // Returns JSON so the SPA can show success/error state and navigate to login.
     @GetMapping("/verify-email")
-    public ResponseEntity<Void> verifyEmail(@RequestParam String token) {
+    public ApiResponse<String> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
-        return ResponseEntity
-                .status(HttpStatus.FOUND)
-                .header("Location", properties.getFrontendUrl() + "/auth/login?activated=true")
-                .build();
+        return ApiResponse.success("Account activated");
     }
 
     /**

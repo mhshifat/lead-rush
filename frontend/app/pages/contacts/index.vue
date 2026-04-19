@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core'
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Badge } from '~/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '~/components/ui/dialog'
 import { toast } from 'vue-sonner'
+import { Search, Plus, Users, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-vue-next'
 import type { ContactFilters } from '~/composables/useContacts'
 
 definePageMeta({
@@ -74,7 +74,13 @@ async function handleCreate() {
   }
 }
 
-// ── Lifecycle stage badge colors ──
+const stageFilters: Array<{ value: string | undefined; label: string }> = [
+  { value: undefined, label: 'All' },
+  { value: 'LEAD', label: 'Lead' },
+  { value: 'QUALIFIED', label: 'Qualified' },
+  { value: 'CUSTOMER', label: 'Customer' },
+]
+
 function stageBadgeVariant(stage: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (stage) {
     case 'LEAD': return 'secondary'
@@ -89,31 +95,34 @@ function stageBadgeVariant(stage: string): 'default' | 'secondary' | 'destructiv
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5 enter-fade-up">
     <!-- Page header -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-end justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold">Contacts</h1>
-        <p class="text-sm text-muted-foreground">
-          {{ contactsPage?.totalElements ?? 0 }} total contacts
+        <h1 class="text-2xl font-semibold tracking-tight">Contacts</h1>
+        <p class="text-sm text-muted-foreground mt-0.5">
+          {{ contactsPage?.totalElements ?? 0 }} {{ (contactsPage?.totalElements ?? 0) === 1 ? 'contact' : 'contacts' }}
         </p>
       </div>
       <Dialog v-model:open="createDialogOpen">
         <DialogTrigger as-child>
-          <Button>+ New Contact</Button>
+          <Button class="gap-1.5">
+            <Plus class="h-4 w-4" />
+            New contact
+          </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Contact</DialogTitle>
+            <DialogTitle>Create contact</DialogTitle>
           </DialogHeader>
           <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-2">
-                <Label for="firstName">First Name *</Label>
+                <Label for="firstName">First name *</Label>
                 <Input id="firstName" v-model="newContact.firstName" required />
               </div>
               <div class="space-y-2">
-                <Label for="lastName">Last Name</Label>
+                <Label for="lastName">Last name</Label>
                 <Input id="lastName" v-model="newContact.lastName" />
               </div>
             </div>
@@ -135,116 +144,134 @@ function stageBadgeVariant(stage: string): 'default' | 'secondary' | 'destructiv
           <DialogFooter>
             <Button variant="outline" @click="createDialogOpen = false">Cancel</Button>
             <Button @click="handleCreate" :disabled="createMutation.isPending.value">
-              {{ createMutation.isPending.value ? 'Creating...' : 'Create' }}
+              {{ createMutation.isPending.value ? 'Creating…' : 'Create' }}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
 
-    <!-- Filters -->
-    <Card>
-      <CardContent class="pt-6">
-        <div class="flex flex-col gap-4 md:flex-row md:items-end">
-          <div class="flex-1 space-y-2">
-            <Label for="search">Search</Label>
-            <Input
-              id="search"
-              v-model="searchInput"
-              placeholder="Search by name..."
-            />
-          </div>
-          <div class="space-y-2 md:w-56">
-            <Label>Lifecycle Stage</Label>
-            <div class="flex gap-1 flex-wrap">
-              <Button
-                size="sm"
-                :variant="!filters.lifecycleStage ? 'default' : 'outline'"
-                @click="setLifecycleStage(undefined)"
-              >All</Button>
-              <Button
-                v-for="stage in ['LEAD', 'QUALIFIED', 'CUSTOMER']"
-                :key="stage"
-                size="sm"
-                :variant="filters.lifecycleStage === stage ? 'default' : 'outline'"
-                @click="setLifecycleStage(stage)"
-              >{{ stage }}</Button>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <!-- Toolbar -->
+    <div class="glass hairline rounded-xl px-3 py-2.5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div class="relative md:max-w-sm md:flex-1">
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          v-model="searchInput"
+          placeholder="Search contacts…"
+          class="pl-9 h-9 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+        />
+      </div>
+      <div class="flex items-center gap-1 overflow-x-auto">
+        <button
+          v-for="stage in stageFilters"
+          :key="stage.value ?? 'all'"
+          class="px-3 py-1.5 rounded-full text-xs font-medium tracking-tight transition-colors whitespace-nowrap"
+          :class="filters.lifecycleStage === stage.value
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:text-foreground hover:bg-white/5'"
+          @click="setLifecycleStage(stage.value)"
+        >
+          {{ stage.label }}
+        </button>
+      </div>
+    </div>
 
-    <!-- Contacts table -->
-    <Card>
-      <CardContent class="pt-6">
-        <div v-if="isLoading" class="text-center py-8 text-muted-foreground">
-          Loading contacts...
-        </div>
+    <!-- Contacts list -->
+    <div class="glass hairline rounded-xl overflow-hidden">
+      <!-- Loading -->
+      <div v-if="isLoading" class="flex items-center justify-center py-16 text-sm text-muted-foreground">
+        Loading…
+      </div>
 
-        <div v-else-if="isError" class="text-center py-8 text-destructive">
-          Failed to load contacts
-        </div>
+      <!-- Error -->
+      <div v-else-if="isError" class="flex flex-col items-center justify-center py-16 gap-2">
+        <AlertCircle class="h-8 w-8 text-destructive/70" />
+        <p class="text-sm text-destructive">Failed to load contacts</p>
+      </div>
 
-        <div v-else-if="!contactsPage?.items.length" class="text-center py-8 text-muted-foreground">
-          No contacts found. Click "New Contact" to create one.
+      <!-- Empty -->
+      <div v-else-if="!contactsPage?.items.length" class="flex flex-col items-center justify-center py-20 px-6 text-center">
+        <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
+          <Users class="h-5 w-5 text-muted-foreground" />
         </div>
+        <h3 class="text-base font-semibold tracking-tight">No contacts yet</h3>
+        <p class="text-sm text-muted-foreground mt-1 max-w-xs">
+          Add your first contact to start building your pipeline.
+        </p>
+        <Button class="mt-5 gap-1.5" @click="createDialogOpen = true">
+          <Plus class="h-4 w-4" />
+          New contact
+        </Button>
+      </div>
 
-        <div v-else class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b text-left">
-                <th class="p-2 font-medium">Name</th>
-                <th class="p-2 font-medium">Email</th>
-                <th class="p-2 font-medium">Company</th>
-                <th class="p-2 font-medium">Title</th>
-                <th class="p-2 font-medium">Stage</th>
-                <th class="p-2 font-medium">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="contact in contactsPage.items"
-                :key="contact.id"
-                class="border-b hover:bg-muted/50 cursor-pointer"
-                @click="navigateTo(`/contacts/${contact.id}`)"
-              >
-                <td class="p-2 font-medium">{{ contact.fullName }}</td>
-                <td class="p-2 text-muted-foreground">{{ contact.primaryEmail ?? '—' }}</td>
-                <td class="p-2">{{ contact.companyName ?? '—' }}</td>
-                <td class="p-2 text-muted-foreground">{{ contact.title ?? '—' }}</td>
-                <td class="p-2">
-                  <Badge :variant="stageBadgeVariant(contact.lifecycleStage)">
-                    {{ contact.lifecycleStage }}
-                  </Badge>
-                </td>
-                <td class="p-2">{{ contact.leadScore }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- Table -->
+      <div v-else class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <th class="px-4 py-3 font-medium">Name</th>
+              <th class="px-4 py-3 font-medium">Email</th>
+              <th class="px-4 py-3 font-medium">Company</th>
+              <th class="px-4 py-3 font-medium">Title</th>
+              <th class="px-4 py-3 font-medium">Stage</th>
+              <th class="px-4 py-3 font-medium text-right">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="contact in contactsPage.items"
+              :key="contact.id"
+              class="cursor-pointer transition-colors hover:bg-white/5"
+              style="border-top: 1px solid hsl(240 5% 100% / 0.05);"
+              @click="navigateTo(`/contacts/${contact.id}`)"
+            >
+              <td class="px-4 py-3 font-medium">{{ contact.fullName }}</td>
+              <td class="px-4 py-3 text-muted-foreground">{{ contact.primaryEmail ?? '—' }}</td>
+              <td class="px-4 py-3">{{ contact.companyName ?? '—' }}</td>
+              <td class="px-4 py-3 text-muted-foreground">{{ contact.title ?? '—' }}</td>
+              <td class="px-4 py-3">
+                <Badge :variant="stageBadgeVariant(contact.lifecycleStage)">
+                  {{ contact.lifecycleStage }}
+                </Badge>
+              </td>
+              <td class="px-4 py-3 text-right tabular-nums">{{ contact.leadScore }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-        <!-- Pagination -->
-        <div v-if="contactsPage && contactsPage.totalPages > 1" class="flex items-center justify-between mt-4 pt-4 border-t">
-          <p class="text-sm text-muted-foreground">
-            Page {{ contactsPage.currentPage + 1 }} of {{ contactsPage.totalPages }}
-          </p>
-          <div class="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              :disabled="contactsPage.currentPage === 0"
-              @click="changePage(-1)"
-            >Previous</Button>
-            <Button
-              size="sm"
-              variant="outline"
-              :disabled="contactsPage.currentPage >= contactsPage.totalPages - 1"
-              @click="changePage(1)"
-            >Next</Button>
-          </div>
+      <!-- Pagination -->
+      <div
+        v-if="contactsPage && contactsPage.totalPages > 1"
+        class="flex items-center justify-between px-4 py-3"
+        style="border-top: 1px solid hsl(240 5% 100% / 0.06);"
+      >
+        <p class="text-xs text-muted-foreground">
+          Page {{ contactsPage.currentPage + 1 }} of {{ contactsPage.totalPages }}
+        </p>
+        <div class="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            class="h-8 gap-1"
+            :disabled="contactsPage.currentPage === 0"
+            @click="changePage(-1)"
+          >
+            <ChevronLeft class="h-4 w-4" />
+            Previous
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            class="h-8 gap-1"
+            :disabled="contactsPage.currentPage >= contactsPage.totalPages - 1"
+            @click="changePage(1)"
+          >
+            Next
+            <ChevronRight class="h-4 w-4" />
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   </div>
 </template>

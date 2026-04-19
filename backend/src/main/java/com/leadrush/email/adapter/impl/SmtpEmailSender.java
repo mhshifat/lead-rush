@@ -106,24 +106,26 @@ public class SmtpEmailSender implements EmailSenderAdapter {
         }
     }
 
-    /** Create a JavaMail Session configured for STARTTLS. */
     private Session createSession(SmtpCredentials credentials) {
         Properties props = new Properties();
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.starttls.required", "true");
+        props.put("mail.smtp.auth", String.valueOf(credentials.requireAuth()));
+        props.put("mail.smtp.starttls.enable", String.valueOf(credentials.useStartTls()));
+        props.put("mail.smtp.starttls.required", String.valueOf(credentials.useStartTls()));
         props.put("mail.smtp.host", credentials.host());
         props.put("mail.smtp.port", String.valueOf(credentials.port()));
-        props.put("mail.smtp.connectiontimeout", "10000");   // 10 seconds
+        props.put("mail.smtp.connectiontimeout", "10000");
         props.put("mail.smtp.timeout", "10000");
 
-        return Session.getInstance(props, new jakarta.mail.Authenticator() {
-            @Override
-            protected jakarta.mail.PasswordAuthentication getPasswordAuthentication() {
-                return new jakarta.mail.PasswordAuthentication(
-                        credentials.username(), credentials.password());
-            }
-        });
+        if (credentials.requireAuth()) {
+            return Session.getInstance(props, new jakarta.mail.Authenticator() {
+                @Override
+                protected jakarta.mail.PasswordAuthentication getPasswordAuthentication() {
+                    return new jakarta.mail.PasswordAuthentication(
+                            credentials.username(), credentials.password());
+                }
+            });
+        }
+        return Session.getInstance(props);
     }
 
     /** Generate a unique Message-ID header (RFC 5322 format). */
