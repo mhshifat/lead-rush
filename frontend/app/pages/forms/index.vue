@@ -24,15 +24,18 @@ const form = ref({
   successMessage: 'Thank you! We\'ll be in touch.',
   autoEnrollSequenceId: '',
 })
+const createErrors = useFieldErrors()
 
 // Active sequences can be auto-enroll targets
 const activeSequences = computed(() => (sequences.value ?? []).filter(s => s.status === 'ACTIVE'))
 
+watch(() => form.value.name, v => { if (v.trim()) createErrors.remove('name') })
+watch(dialogOpen, (open) => { if (open) createErrors.clear() })
+
 async function handleCreate() {
-  if (!form.value.name.trim()) {
-    toast.error('Name is required')
-    return
-  }
+  createErrors.clear()
+  if (!form.value.name.trim()) createErrors.set('name', 'Name is required.')
+  if (Object.keys(createErrors.map).length) return
   try {
     await createMutation.mutateAsync({
       name: form.value.name,
@@ -49,7 +52,7 @@ async function handleCreate() {
     dialogOpen.value = false
     form.value = { name: '', description: '', successMessage: 'Thank you! We\'ll be in touch.', autoEnrollSequenceId: '' }
   } catch (error: any) {
-    toast.error(error?.data?.error?.message || 'Failed to create form')
+    createErrors.fromServerError(error, 'Failed to create form')
   }
 }
 
@@ -81,9 +84,21 @@ function fieldCount(fields: any): number {
             <DialogTitle>Create Form</DialogTitle>
           </DialogHeader>
           <div class="space-y-4">
+            <div
+              v-if="createErrors.has('_form')"
+              class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {{ createErrors.get('_form') }}
+            </div>
             <div class="space-y-2">
               <Label for="name">Name *</Label>
-              <Input id="name" v-model="form.name" placeholder="Newsletter Signup" />
+              <Input
+                id="name"
+                v-model="form.name"
+                placeholder="Newsletter Signup"
+                :class="createErrors.has('name') ? 'border-destructive' : ''"
+              />
+              <SharedFormError :message="createErrors.get('name')" />
             </div>
             <div class="space-y-2">
               <Label for="description">Description</Label>

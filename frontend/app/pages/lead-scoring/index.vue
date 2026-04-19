@@ -42,6 +42,9 @@ const form = ref<CreateLeadScoreRuleDto>({
   points: 5,
   enabled: true,
 })
+const errors = useFieldErrors()
+
+watch(() => form.value.name, v => { if (v.trim()) errors.remove('name') })
 
 function openCreate() {
   editing.value = null
@@ -55,6 +58,7 @@ function openCreate() {
     points: 5,
     enabled: true,
   }
+  errors.clear()
   dialogOpen.value = true
 }
 
@@ -70,14 +74,14 @@ function openEdit(rule: LeadScoreRuleEntity) {
     points: rule.points,
     enabled: rule.enabled,
   }
+  errors.clear()
   dialogOpen.value = true
 }
 
 async function handleSave() {
-  if (!form.value.name.trim()) {
-    toast.error('Name is required')
-    return
-  }
+  errors.clear()
+  if (!form.value.name.trim()) errors.set('name', 'Name is required.')
+  if (Object.keys(errors.map).length) return
   // Strip empty condition fields so backend treats them as null
   const payload: CreateLeadScoreRuleDto = {
     name: form.value.name.trim(),
@@ -98,8 +102,8 @@ async function handleSave() {
       toast.success('Rule created')
     }
     dialogOpen.value = false
-  } catch {
-    toast.error('Failed to save rule')
+  } catch (error: any) {
+    errors.fromServerError(error, 'Failed to save rule')
   }
 }
 
@@ -248,9 +252,21 @@ function fieldLabel(field: string | null): string {
         </DialogHeader>
 
         <div class="space-y-4 py-2">
+          <div
+            v-if="errors.has('_form')"
+            class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {{ errors.get('_form') }}
+          </div>
           <div class="space-y-2">
             <Label for="name">Name *</Label>
-            <Input id="name" v-model="form.name" placeholder="e.g., CEO opened an email" />
+            <Input
+              id="name"
+              v-model="form.name"
+              placeholder="e.g., CEO opened an email"
+              :class="errors.has('name') ? 'border-destructive' : ''"
+            />
+            <SharedFormError :message="errors.get('name')" />
           </div>
 
           <div class="space-y-2">

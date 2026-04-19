@@ -61,6 +61,15 @@ const form = ref({
   smtpPassword: '',
   dailyLimit: 100,
 })
+const connectErrors = useFieldErrors()
+
+// Touch-to-clear per field.
+watch(() => form.value.name, v => { if (v.trim()) connectErrors.remove('name') })
+watch(() => form.value.email, v => { if (v.trim()) connectErrors.remove('email') })
+watch(() => form.value.smtpHost, v => { if (v.trim()) connectErrors.remove('smtpHost') })
+watch(() => form.value.smtpPort, v => { if (v) connectErrors.remove('smtpPort') })
+watch(() => form.value.smtpPassword, v => { if (v) connectErrors.remove('smtpPassword') })
+watch(dialogOpen, (open) => { if (open) connectErrors.clear() })
 
 // Presets — auto-fill host/port based on provider choice
 function applyProviderPreset(p: 'SMTP' | 'GMAIL' | 'OUTLOOK') {
@@ -78,10 +87,13 @@ function applyProviderPreset(p: 'SMTP' | 'GMAIL' | 'OUTLOOK') {
 }
 
 async function handleConnect() {
-  if (!form.value.name || !form.value.email || !form.value.smtpPassword) {
-    toast.error('Please fill in all required fields')
-    return
-  }
+  connectErrors.clear()
+  if (!form.value.name.trim()) connectErrors.set('name', 'Name is required.')
+  if (!form.value.email.trim()) connectErrors.set('email', 'From email is required.')
+  if (!form.value.smtpHost.trim()) connectErrors.set('smtpHost', 'SMTP host is required.')
+  if (!form.value.smtpPort) connectErrors.set('smtpPort', 'Port is required.')
+  if (!form.value.smtpPassword) connectErrors.set('smtpPassword', 'Password is required.')
+  if (Object.keys(connectErrors.map).length) return
 
   try {
     await connectMutation.mutateAsync({
@@ -98,8 +110,7 @@ async function handleConnect() {
     dialogOpen.value = false
     form.value = { name: '', email: '', smtpHost: '', smtpPort: 587, smtpUsername: '', smtpPassword: '', dailyLimit: 100 }
   } catch (error: any) {
-    const msg = error?.data?.error?.message || 'Failed to connect mailbox'
-    toast.error(msg)
+    connectErrors.fromServerError(error, 'Failed to connect mailbox')
   }
 }
 
@@ -184,23 +195,53 @@ function statusBadgeVariant(status: string): 'default' | 'secondary' | 'destruct
             >Custom SMTP</Button>
           </div>
 
+          <div
+            v-if="connectErrors.has('_form')"
+            class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {{ connectErrors.get('_form') }}
+          </div>
           <div class="space-y-3">
             <div class="space-y-2">
               <Label for="name">Name *</Label>
-              <Input id="name" v-model="form.name" placeholder="Sales Inbox" />
+              <Input
+                id="name"
+                v-model="form.name"
+                placeholder="Sales Inbox"
+                :class="connectErrors.has('name') ? 'border-destructive' : ''"
+              />
+              <SharedFormError :message="connectErrors.get('name')" />
             </div>
             <div class="space-y-2">
               <Label for="email">From Email *</Label>
-              <Input id="email" v-model="form.email" type="email" placeholder="sales@company.com" />
+              <Input
+                id="email"
+                v-model="form.email"
+                type="email"
+                placeholder="sales@company.com"
+                :class="connectErrors.has('email') ? 'border-destructive' : ''"
+              />
+              <SharedFormError :message="connectErrors.get('email')" />
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-2">
                 <Label for="smtpHost">SMTP Host *</Label>
-                <Input id="smtpHost" v-model="form.smtpHost" />
+                <Input
+                  id="smtpHost"
+                  v-model="form.smtpHost"
+                  :class="connectErrors.has('smtpHost') ? 'border-destructive' : ''"
+                />
+                <SharedFormError :message="connectErrors.get('smtpHost')" />
               </div>
               <div class="space-y-2">
                 <Label for="smtpPort">Port *</Label>
-                <Input id="smtpPort" v-model.number="form.smtpPort" type="number" />
+                <Input
+                  id="smtpPort"
+                  v-model.number="form.smtpPort"
+                  type="number"
+                  :class="connectErrors.has('smtpPort') ? 'border-destructive' : ''"
+                />
+                <SharedFormError :message="connectErrors.get('smtpPort')" />
               </div>
             </div>
             <div class="space-y-2">
@@ -209,7 +250,13 @@ function statusBadgeVariant(status: string): 'default' | 'secondary' | 'destruct
             </div>
             <div class="space-y-2">
               <Label for="smtpPassword">Password / App Password *</Label>
-              <Input id="smtpPassword" v-model="form.smtpPassword" type="password" />
+              <Input
+                id="smtpPassword"
+                v-model="form.smtpPassword"
+                type="password"
+                :class="connectErrors.has('smtpPassword') ? 'border-destructive' : ''"
+              />
+              <SharedFormError :message="connectErrors.get('smtpPassword')" />
             </div>
             <div class="space-y-2">
               <Label for="dailyLimit">Daily Send Limit</Label>

@@ -49,22 +49,21 @@ public class EnrichmentService {
         UUID workspaceId = TenantContext.getWorkspaceId();
         List<EnrichmentProvider> configs = providerRepository.findByWorkspaceIdOrderByPriorityAsc(workspaceId);
 
-        // Ensure every known adapter has a config row (disabled by default)
+        // Ensure every known adapter has a config row (disabled by default).
+        // Priority follows the waterfall design: free/instant tiers first, paid last.
         Map<String, EnrichmentProvider> byKey = configs.stream()
                 .collect(Collectors.toMap(EnrichmentProvider::getProviderKey, c -> c));
 
-        int nextPriority = configs.stream().mapToInt(EnrichmentProvider::getPriority).max().orElse(0) + 10;
         for (EnrichmentProviderAdapter adapter : allAdapters) {
             if (!byKey.containsKey(adapter.providerKey())) {
                 EnrichmentProvider fresh = EnrichmentProvider.builder()
                         .providerKey(adapter.providerKey())
                         .enabled(false)
-                        .priority(nextPriority)
+                        .priority(defaultPriority(adapter.providerKey()))
                         .build();
                 fresh.setWorkspaceId(workspaceId);
                 fresh = providerRepository.save(fresh);
                 byKey.put(adapter.providerKey(), fresh);
-                nextPriority += 10;
             }
         }
 
@@ -215,6 +214,24 @@ public class EnrichmentService {
                 .filter(a -> a.providerKey().equals(key))
                 .findFirst()
                 .orElse(null);
+    }
+
+    // Waterfall order: free tiers first (cache, scrape, github), then the paid APIs.
+    // Companies House runs last as a title-only enrichment.
+    // Lower number = tried first.
+    private static int defaultPriority(String providerKey) {
+        return switch (providerKey) {
+            case "PATTERN_CACHE"        -> 10;
+            case "COMPANY_CRAWL_CACHE"  -> 15;
+            case "GITHUB"               -> 20;
+            case "SITEMAP_CRAWLER"      -> 25;
+            case "WEBSITE_SCRAPER"      -> 30;
+            case "MOCK"                 -> 50;
+            case "HUNTER"               -> 60;
+            case "PDL"                  -> 70;
+            case "COMPANIES_HOUSE"      -> 80;
+            default                     -> 100;
+        };
     }
 
     private EnrichmentProviderResponse toProviderResponse(EnrichmentProvider config) {

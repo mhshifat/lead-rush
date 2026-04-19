@@ -85,6 +85,7 @@ leadrush:
     from-address: ${EMAIL_FROM_ADDRESS:noreply@leadrush.local}
     from-name: ${EMAIL_FROM_NAME:Lead Rush}
 
+
 # ── Swagger / OpenAPI ──
 springdoc:
   api-docs:

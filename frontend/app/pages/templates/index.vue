@@ -5,12 +5,15 @@
   - Supports {{firstName}}, {{lastName}}, {{fullName}}, {{companyName}}, {{title}}, {{email}}
 -->
 <script setup lang="ts">
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '~/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '~/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '~/components/ui/select'
 import { toast } from 'vue-sonner'
+import { Plus, Mail, Pencil, Trash2 } from 'lucide-vue-next'
 
 definePageMeta({
   middleware: 'auth',
@@ -21,13 +24,29 @@ const createMutation = useCreateEmailTemplate()
 const updateMutation = useUpdateEmailTemplate()
 const deleteMutation = useDeleteEmailTemplate()
 
-// AI
+// AI mutations
 const { data: aiStatus } = useAIStatus()
 const generateEmailMutation = useGenerateEmail()
 const suggestSubjectsMutation = useSuggestSubjects()
 const aiReady = computed(() => aiStatus.value?.ready ?? false)
 
-// For the "Generate email" dialog — pull up to 50 contacts to pick from
+// Main editor state (declared BEFORE any handler that touches it so TS / ESLint
+// don't complain about block-scoped `form` / `errors` being used before init).
+const dialogOpen = ref(false)
+const editingId = ref<string | null>(null)
+
+const form = ref({
+  name: '',
+  subject: '',
+  bodyHtml: '',
+  bodyText: '',
+})
+const errors = useFieldErrors()
+
+watch(() => form.value.name, v => { if (v.trim()) errors.remove('name') })
+watch(() => form.value.subject, v => { if (v.trim()) errors.remove('subject') })
+
+// AI-generate dialog state
 const contactFilters = ref({ page: 0, size: 50, sort: 'createdAt,desc' })
 const { data: contactsPage } = useContacts(contactFilters)
 const aiDialogOpen = ref(false)
@@ -36,11 +55,19 @@ const aiValueProp = ref('')
 const aiTone = ref('')
 const aiLength = ref<'SHORT' | 'MEDIUM' | 'LONG'>('MEDIUM')
 
-// For subject-line suggestions
+// Subject-line suggestions rendered under the Subject input
 const subjectSuggestions = ref<string[]>([])
 
+// Separate error bag for the AI-generate dialog so validation there stays inline
+// and doesn't clobber errors on the main save form behind it.
+const aiErrors = useFieldErrors()
+watch(aiContactId, v => { if (v) aiErrors.remove('aiContactId') })
+watch(aiDialogOpen, (open) => { if (open) aiErrors.clear() })
+
 async function handleGenerateEmail() {
-  if (!aiContactId.value) { toast.error('Pick a contact to personalize for'); return }
+  aiErrors.clear()
+  if (!aiContactId.value) aiErrors.set('aiContactId', 'Pick a contact to personalize for.')
+  if (Object.keys(aiErrors.map).length) return
   try {
     const result = await generateEmailMutation.mutateAsync({
       contactId: aiContactId.value,
@@ -54,12 +81,17 @@ async function handleGenerateEmail() {
     aiDialogOpen.value = false
     toast.success('Email drafted — review and tweak before saving')
   } catch (error: any) {
-    toast.error(error?.data?.error?.message ?? 'Failed to generate email')
+    aiErrors.fromServerError(error, 'Failed to generate email')
   }
 }
 
 async function handleSuggestSubjects() {
-  if (!form.value.subject.trim()) { toast.error('Enter a subject first, then ask for variants'); return }
+  // Suggest-subjects is a button action on the main form, so reuse the main
+  // `errors` instance and surface the issue next to the Subject input.
+  if (!form.value.subject.trim()) {
+    errors.set('subject', 'Enter a subject first, then ask for variants.')
+    return
+  }
   try {
     subjectSuggestions.value = await suggestSubjectsMutation.mutateAsync({
       subject: form.value.subject,
@@ -76,17 +108,6 @@ function applySubject(s: string) {
   subjectSuggestions.value = []
 }
 
-// ── Editor state ──
-const dialogOpen = ref(false)
-const editingId = ref<string | null>(null)
-
-const form = ref({
-  name: '',
-  subject: '',
-  bodyHtml: '',
-  bodyText: '',
-})
-
 const AVAILABLE_VARIABLES = [
   { key: '{{firstName}}', label: 'First Name' },
   { key: '{{lastName}}', label: 'Last Name' },
@@ -99,6 +120,7 @@ const AVAILABLE_VARIABLES = [
 function openCreateDialog() {
   editingId.value = null
   form.value = { name: '', subject: '', bodyHtml: '', bodyText: '' }
+  errors.clear()
   dialogOpen.value = true
 }
 
@@ -110,6 +132,7 @@ function openEditDialog(template: any) {
     bodyHtml: template.bodyHtml ?? '',
     bodyText: template.bodyText ?? '',
   }
+  errors.clear()
   dialogOpen.value = true
 }
 
@@ -118,10 +141,13 @@ function insertVariable(variable: string) {
 }
 
 async function handleSave() {
-  if (!form.value.name.trim() || !form.value.subject.trim()) {
-    toast.error('Name and subject are required')
-    return
+  errors.clear()
+  if (!form.value.name.trim()) errors.set('name', 'Name is required.')
+  if (!form.value.subject.trim()) errors.set('subject', 'Subject is required.')
+  if (!form.value.bodyHtml.trim() && !form.value.bodyText.trim()) {
+    errors.set('bodyHtml', 'Add either an HTML body or a plain-text fallback.')
   }
+  if (Object.keys(errors.map).length) return
 
   try {
     if (editingId.value) {
@@ -133,7 +159,7 @@ async function handleSave() {
     }
     dialogOpen.value = false
   } catch (error: any) {
-    toast.error(error?.data?.error?.message || 'Failed to save template')
+    errors.fromServerError(error, 'Failed to save template')
   }
 }
 
@@ -154,22 +180,40 @@ async function handleDelete(id: string, name: string) {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-center justify-between">
+  <div class="space-y-5 enter-fade-up">
+    <div class="flex items-end justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold">Email Templates</h1>
-        <p class="text-sm text-muted-foreground">Reusable templates for sequences and manual sends</p>
+        <h1 class="text-2xl font-semibold tracking-tight">Email templates</h1>
+        <p class="text-sm text-muted-foreground mt-0.5">
+          Reusable templates with variables like
+          <code class="bg-muted px-1 rounded text-xs">{{ '{' + '{firstName}' + '}' }}</code>
+          for sequences and manual sends.
+        </p>
       </div>
       <Dialog v-model:open="dialogOpen">
         <DialogTrigger as-child>
-          <Button @click="openCreateDialog">+ New Template</Button>
+          <Button class="gap-1.5" @click="openCreateDialog">
+            <Plus class="h-4 w-4" />
+            New template
+          </Button>
         </DialogTrigger>
         <DialogContent class="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{{ editingId ? 'Edit Template' : 'New Template' }}</DialogTitle>
+            <DialogTitle>{{ editingId ? 'Edit template' : 'New template' }}</DialogTitle>
+            <DialogDescription>
+              Write once, reuse across every sequence + manual send.
+            </DialogDescription>
           </DialogHeader>
 
           <div class="space-y-4">
+            <!-- Top-of-form banner for server-side errors. -->
+            <div
+              v-if="errors.has('_form')"
+              class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {{ errors.get('_form') }}
+            </div>
+
             <div class="flex items-center justify-between gap-2">
               <p class="text-xs text-muted-foreground">
                 Use <code class="bg-muted px-1">{{ '{' + '{firstName}' + '}' }}</code> etc. to personalize.
@@ -187,7 +231,13 @@ async function handleDelete(id: string, name: string) {
 
             <div class="space-y-2">
               <Label for="name">Name *</Label>
-              <Input id="name" v-model="form.name" placeholder="Intro Email" />
+              <Input
+                id="name"
+                v-model="form.name"
+                placeholder="Intro Email"
+                :class="errors.has('name') ? 'border-destructive' : ''"
+              />
+              <SharedFormError :message="errors.get('name')" />
             </div>
 
             <div class="space-y-2">
@@ -205,7 +255,13 @@ async function handleDelete(id: string, name: string) {
                   ✨ Suggest variants
                 </Button>
               </div>
-              <Input id="subject" v-model="form.subject" placeholder="Hi {{firstName}}, quick question" />
+              <Input
+                id="subject"
+                v-model="form.subject"
+                placeholder="Hi {{firstName}}, quick question"
+                :class="errors.has('subject') ? 'border-destructive' : ''"
+              />
+              <SharedFormError :message="errors.get('subject')" />
               <div v-if="subjectSuggestions.length" class="space-y-1 rounded-md border p-2">
                 <p class="text-xs text-muted-foreground px-1">Click one to use it:</p>
                 <button
@@ -240,9 +296,11 @@ async function handleDelete(id: string, name: string) {
                 id="bodyHtml"
                 v-model="form.bodyHtml"
                 rows="10"
-                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+                class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
+                :class="errors.has('bodyHtml') ? 'border-destructive' : 'border-input'"
                 placeholder="<p>Hi {{firstName}},</p><p>I noticed you work at {{companyName}}...</p>"
               />
+              <SharedFormError :message="errors.get('bodyHtml')" />
             </div>
 
             <div class="space-y-2">
@@ -274,22 +332,33 @@ async function handleDelete(id: string, name: string) {
           <DialogTitle>Generate an email with AI</DialogTitle>
         </DialogHeader>
         <div class="space-y-4">
+          <div
+            v-if="aiErrors.has('_form')"
+            class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {{ aiErrors.get('_form') }}
+          </div>
           <div class="space-y-2">
             <Label for="aiContact">Personalize for *</Label>
-            <select
-              id="aiContact"
-              v-model="aiContactId"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-            >
-              <option value="">Pick a contact…</option>
-              <option
-                v-for="c in contactsPage?.items ?? []"
-                :key="c.id"
-                :value="c.id"
+            <Select v-model="aiContactId">
+              <SelectTrigger
+                id="aiContact"
+                class="w-full"
+                :class="aiErrors.has('aiContactId') ? 'border-destructive' : ''"
               >
-                {{ c.fullName }}{{ c.title ? ' · ' + c.title : '' }}{{ c.companyName ? ' · ' + c.companyName : '' }}
-              </option>
-            </select>
+                <SelectValue placeholder="Pick a contact…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="c in contactsPage?.items ?? []"
+                  :key="c.id"
+                  :value="c.id"
+                >
+                  {{ c.fullName }}{{ c.title ? ' · ' + c.title : '' }}{{ c.companyName ? ' · ' + c.companyName : '' }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <SharedFormError :message="aiErrors.get('aiContactId')" />
             <p class="text-xs text-muted-foreground">
               The AI uses this contact's first name, title, and company as context — then replaces them with
               <code class="bg-muted px-1">{{ '{' + '{firstName}' + '}' }}</code> variables in the output so the template stays reusable.
@@ -338,33 +407,89 @@ async function handleDelete(id: string, name: string) {
       </DialogContent>
     </Dialog>
 
-    <!-- Template list -->
-    <div v-if="isLoading" class="text-center py-8 text-muted-foreground">
-      Loading templates...
+    <!-- Loading -->
+    <div
+      v-if="isLoading"
+      class="glass hairline rounded-xl py-16 text-center text-sm text-muted-foreground"
+    >
+      Loading templates…
     </div>
 
-    <div v-else-if="!templates?.length" class="text-center py-12">
-      <p class="text-muted-foreground">No templates yet. Create one to start building sequences.</p>
+    <!-- Empty state -->
+    <div
+      v-else-if="!templates?.length"
+      class="glass hairline rounded-xl py-14 px-6 text-center"
+    >
+      <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+        <Mail class="h-5 w-5 text-muted-foreground" />
+      </div>
+      <h3 class="text-sm font-semibold tracking-tight">No templates yet</h3>
+      <p class="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+        Templates are reusable email bodies with variables like
+        <code class="bg-muted px-1 rounded text-xs">{{ '{' + '{firstName}' + '}' }}</code>
+        that sequences use to personalise every send.
+      </p>
+      <Button class="mt-5 gap-1.5" @click="openCreateDialog">
+        <Plus class="h-4 w-4" />
+        New template
+      </Button>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <Card v-for="tpl in templates" :key="tpl.id">
-        <CardHeader>
-          <CardTitle class="text-base">{{ tpl.name }}</CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-3">
-          <p class="text-sm font-medium truncate">{{ tpl.subject }}</p>
-          <p class="text-xs text-muted-foreground line-clamp-3">
-            {{ tpl.bodyText || tpl.bodyHtml?.replace(/<[^>]*>/g, '') || '(empty)' }}
-          </p>
-          <div class="flex gap-2 pt-2">
-            <Button size="sm" variant="outline" class="flex-1" @click="openEditDialog(tpl)">Edit</Button>
-            <Button size="sm" variant="outline" class="flex-1 text-destructive" @click="handleDelete(tpl.id, tpl.name)">
-              Delete
-            </Button>
+    <!-- Grid of templates -->
+    <div
+      v-else
+      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+    >
+      <div
+        v-for="tpl in templates"
+        :key="tpl.id"
+        class="glass hairline rounded-xl p-5 flex flex-col transition-colors hover:bg-white/2"
+      >
+        <div class="flex items-start gap-3 min-w-0">
+          <div class="h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Mail class="h-4 w-4 text-primary" />
           </div>
-        </CardContent>
-      </Card>
+          <div class="min-w-0 flex-1">
+            <h3 class="font-semibold tracking-tight truncate">{{ tpl.name }}</h3>
+            <p class="text-xs text-muted-foreground mt-0.5 truncate" :title="tpl.subject">
+              {{ tpl.subject }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Body preview — 3-line clamp on the plain-text version -->
+        <p
+          class="mt-4 text-xs text-muted-foreground line-clamp-3 flex-1"
+          style="min-height: 3.6em;"
+        >
+          {{ tpl.bodyText || tpl.bodyHtml?.replace(/<[^>]*>/g, '') || '(empty)' }}
+        </p>
+
+        <!-- Actions — icon + label, tight row -->
+        <div
+          class="mt-4 flex gap-1"
+          style="border-top: 1px solid hsl(240 5% 100% / 0.05); padding-top: 12px;"
+        >
+          <Button
+            size="sm"
+            variant="ghost"
+            class="flex-1 h-8 gap-1.5"
+            @click="openEditDialog(tpl)"
+          >
+            <Pencil class="h-3.5 w-3.5" />
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            class="flex-1 h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+            @click="handleDelete(tpl.id, tpl.name)"
+          >
+            <Trash2 class="h-3.5 w-3.5" />
+            Delete
+          </Button>
+        </div>
+      </div>
     </div>
   </div>
 </template>

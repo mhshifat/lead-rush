@@ -36,15 +36,19 @@ const isOwner = computed(() => authStore.currentWorkspace?.role === 'OWNER')
 
 // ── Workspace name edit ──
 const wsName = ref('')
+const wsErrors = useFieldErrors()
 watch(currentWs, (ws) => { if (ws) wsName.value = ws.name }, { immediate: true })
+watch(wsName, v => { if (v.trim()) wsErrors.remove('wsName') })
 
 async function handleSaveName() {
-  if (!wsName.value.trim()) { toast.error('Name is required'); return }
+  wsErrors.clear()
+  if (!wsName.value.trim()) wsErrors.set('wsName', 'Name is required.')
+  if (Object.keys(wsErrors.map).length) return
   try {
     await updateWsMutation.mutateAsync({ name: wsName.value.trim() })
     toast.success('Workspace updated')
-  } catch {
-    toast.error('Failed to update workspace')
+  } catch (error: any) {
+    wsErrors.fromServerError(error, 'Failed to update workspace')
   }
 }
 
@@ -52,9 +56,15 @@ async function handleSaveName() {
 const inviteOpen = ref(false)
 const inviteEmail = ref('')
 const inviteRole = ref<WorkspaceRole>('MEMBER')
+const inviteErrors = useFieldErrors()
+
+watch(inviteEmail, v => { if (v.trim()) inviteErrors.remove('inviteEmail') })
+watch(inviteOpen, (open) => { if (open) inviteErrors.clear() })
 
 async function handleInvite() {
-  if (!inviteEmail.value.trim()) { toast.error('Email is required'); return }
+  inviteErrors.clear()
+  if (!inviteEmail.value.trim()) inviteErrors.set('inviteEmail', 'Email is required.')
+  if (Object.keys(inviteErrors.map).length) return
   try {
     await inviteMutation.mutateAsync({ email: inviteEmail.value.trim(), role: inviteRole.value })
     toast.success('Invitation sent')
@@ -62,7 +72,7 @@ async function handleInvite() {
     inviteEmail.value = ''
     inviteRole.value = 'MEMBER'
   } catch (error: any) {
-    toast.error(error?.data?.error?.message ?? 'Failed to send invitation')
+    inviteErrors.fromServerError(error, 'Failed to send invitation')
   }
 }
 
@@ -134,15 +144,27 @@ function formatDate(d: Date): string {
         <CardDescription>Shown in the sidebar and on invitation emails.</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
+        <div
+          v-if="wsErrors.has('_form')"
+          class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+        >
+          {{ wsErrors.get('_form') }}
+        </div>
         <div class="space-y-2">
           <Label for="wsName">Name</Label>
           <div class="flex gap-2">
-            <Input id="wsName" v-model="wsName" :disabled="!isManager" />
+            <Input
+              id="wsName"
+              v-model="wsName"
+              :disabled="!isManager"
+              :class="wsErrors.has('wsName') ? 'border-destructive' : ''"
+            />
             <Button
               :disabled="!isManager || updateWsMutation.isPending.value || wsName === currentWs?.name"
               @click="handleSaveName"
             >Save</Button>
           </div>
+          <SharedFormError :message="wsErrors.get('wsName')" />
         </div>
         <p v-if="!isManager" class="text-xs text-muted-foreground">Only owners and admins can edit workspace settings.</p>
       </CardContent>
@@ -244,9 +266,22 @@ function formatDate(d: Date): string {
           <CardDescription>They'll receive an email with a link that expires in 7 days.</CardDescription>
         </DialogHeader>
         <div class="space-y-4">
+          <div
+            v-if="inviteErrors.has('_form')"
+            class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {{ inviteErrors.get('_form') }}
+          </div>
           <div class="space-y-2">
             <Label for="inviteEmail">Email *</Label>
-            <Input id="inviteEmail" v-model="inviteEmail" type="email" placeholder="teammate@company.com" />
+            <Input
+              id="inviteEmail"
+              v-model="inviteEmail"
+              type="email"
+              placeholder="teammate@company.com"
+              :class="inviteErrors.has('inviteEmail') ? 'border-destructive' : ''"
+            />
+            <SharedFormError :message="inviteErrors.get('inviteEmail')" />
           </div>
           <div class="space-y-2">
             <Label for="inviteRole">Role</Label>

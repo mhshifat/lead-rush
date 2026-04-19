@@ -46,13 +46,21 @@ const newContact = ref({
   title: '',
 })
 
+const createErrors = useFieldErrors()
+
+// Touch-to-clear: remove the error the moment the user starts fixing the field.
+watch(() => newContact.value.firstName, v => { if (v.trim()) createErrors.remove('firstName') })
+
+// Reset errors every time the dialog opens (a stale error from a previous attempt
+// would otherwise linger until the next submit).
+watch(createDialogOpen, (open) => { if (open) createErrors.clear() })
+
 const createMutation = useCreateContact()
 
 async function handleCreate() {
-  if (!newContact.value.firstName.trim()) {
-    toast.error('First name is required')
-    return
-  }
+  createErrors.clear()
+  if (!newContact.value.firstName.trim()) createErrors.set('firstName', 'First name is required.')
+  if (Object.keys(createErrors.map).length) return
 
   try {
     await createMutation.mutateAsync({
@@ -69,8 +77,7 @@ async function handleCreate() {
     // Reset form
     newContact.value = { firstName: '', lastName: '', email: '', companyName: '', title: '' }
   } catch (error: any) {
-    const msg = error?.data?.error?.message || 'Failed to create contact'
-    toast.error(msg)
+    createErrors.fromServerError(error, 'Failed to create contact')
   }
 }
 
@@ -116,10 +123,22 @@ function stageBadgeVariant(stage: string): 'default' | 'secondary' | 'destructiv
             <DialogTitle>Create contact</DialogTitle>
           </DialogHeader>
           <div class="space-y-4">
+            <div
+              v-if="createErrors.has('_form')"
+              class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {{ createErrors.get('_form') }}
+            </div>
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-2">
                 <Label for="firstName">First name *</Label>
-                <Input id="firstName" v-model="newContact.firstName" required />
+                <Input
+                  id="firstName"
+                  v-model="newContact.firstName"
+                  required
+                  :class="createErrors.has('firstName') ? 'border-destructive' : ''"
+                />
+                <SharedFormError :message="createErrors.get('firstName')" />
               </div>
               <div class="space-y-2">
                 <Label for="lastName">Last name</Label>

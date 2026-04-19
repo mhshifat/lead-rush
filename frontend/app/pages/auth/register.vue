@@ -2,6 +2,7 @@
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { Checkbox } from '~/components/ui/checkbox'
 import { Eye, EyeOff } from 'lucide-vue-next'
 
 definePageMeta({
@@ -177,11 +178,9 @@ async function handleSubmit() {
 
         <!-- Terms + privacy -->
         <label class="flex items-start gap-2 cursor-pointer select-none">
-          <input
+          <Checkbox
             v-model="acceptedTerms"
-            type="checkbox"
-            required
-            class="mt-0.5 h-4 w-4 rounded border border-input bg-background accent-primary cursor-pointer"
+            class="mt-0.5"
           />
           <span class="text-sm text-muted-foreground leading-snug">
             I agree to the

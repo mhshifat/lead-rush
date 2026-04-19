@@ -59,6 +59,15 @@ const formValues = ref<Record<string, Record<string, string>>>({})
 const submittingFormId = ref<string | null>(null)
 const submittedForms = ref<Set<string>>(new Set())
 
+// One error-bag per form on the page. Field keys are dynamic (from the form
+// schema) so we scope errors under `${formId}.${fieldKey}` to keep forms
+// independent when the page renders more than one.
+const formErrors: Record<string, ReturnType<typeof useFieldErrors>> = {}
+function errorsFor(formId: string) {
+  if (!formErrors[formId]) formErrors[formId] = useFieldErrors()
+  return formErrors[formId]
+}
+
 function getFormDef(formId: string) {
   return pageResponse.value?.data.forms.find(f => f.id === formId) ?? null
 }
@@ -94,13 +103,17 @@ watchEffect(() => {
 async function handleSubmit(formId: string) {
   const fields = getFieldsForForm(getFormDef(formId))
   const values = formValues.value[formId] ?? {}
+  const errors = errorsFor(formId)
 
-  // Check required fields
-  const missing = fields.filter(f => f.required && !values[f.key]?.trim())
-  if (missing.length > 0) {
-    toast.error(`Required: ${missing.map(f => f.label).join(', ')}`)
-    return
+  // Check required fields — flag each offending field individually under its
+  // own name so the error renders inline next to that input.
+  errors.clear()
+  for (const f of fields) {
+    if (f.required && !values[f.key]?.trim()) {
+      errors.set(f.key, `${f.label} is required.`)
+    }
   }
+  if (Object.keys(errors.map).length) return
 
   submittingFormId.value = formId
   try {
@@ -128,11 +141,24 @@ async function handleSubmit(formId: string) {
       toast.success(response.data.message)
     }
   } catch (err: any) {
-    toast.error(err?.data?.error?.message ?? 'Submission failed')
+    errors.fromServerError(err, 'Submission failed')
   } finally {
     submittingFormId.value = null
   }
 }
+
+// Touch-to-clear: remove a field's error as soon as the user starts typing.
+// Using a single watcher over the whole formValues map — we inspect what
+// changed and drop any error for a now-filled field.
+watch(formValues, (val) => {
+  for (const [formId, bucket] of Object.entries(val)) {
+    const errs = formErrors[formId]
+    if (!errs) continue
+    for (const [k, v] of Object.entries(bucket)) {
+      if (v?.trim()) errs.remove(k)
+    }
+  }
+}, { deep: true })
 </script>
 
 <template>
@@ -189,6 +215,12 @@ async function handleSubmit(formId: string) {
               @submit.prevent="handleSubmit(block.props.formId)"
               class="max-w-md mx-auto space-y-4 p-6 border rounded-lg bg-gray-50"
             >
+              <div
+                v-if="errorsFor(block.props.formId).has('_form')"
+                class="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700"
+              >
+                {{ errorsFor(block.props.formId).get('_form') }}
+              </div>
               <template
                 v-for="field in getFieldsForForm(getFormDef(block.props.formId))"
                 :key="field.key"
@@ -203,7 +235,10 @@ async function handleSubmit(formId: string) {
                     :id="`${block.props.formId}-${field.key}`"
                     :required="field.required"
                     v-model="valuesFor(block.props.formId)[field.key]"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    class="w-full rounded-md px-3 py-2 text-sm"
+                    :class="errorsFor(block.props.formId).has(field.key)
+                      ? 'border border-red-500'
+                      : 'border border-gray-300'"
                     rows="4"
                   />
                   <input
@@ -212,8 +247,17 @@ async function handleSubmit(formId: string) {
                     :type="field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text'"
                     :required="field.required"
                     v-model="valuesFor(block.props.formId)[field.key]"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    class="w-full rounded-md px-3 py-2 text-sm"
+                    :class="errorsFor(block.props.formId).has(field.key)
+                      ? 'border border-red-500'
+                      : 'border border-gray-300'"
                   />
+                  <p
+                    v-if="errorsFor(block.props.formId).has(field.key)"
+                    class="text-xs text-red-600"
+                  >
+                    {{ errorsFor(block.props.formId).get(field.key) }}
+                  </p>
                 </div>
               </template>
               <button

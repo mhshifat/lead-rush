@@ -4,6 +4,10 @@ import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Badge } from '~/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '~/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '~/components/ui/select'
 import { toast } from 'vue-sonner'
 import {
   ArrowLeft, Sparkles, UserPlus, Trash2, TrendingUp,
@@ -31,19 +35,34 @@ const deleteMutation = useDeleteContact()
 const enrollMutation = useEnrollContact()
 const enrichMutation = useEnrichContact()
 
+// Enrich button is a dead click unless at least one provider is configured + enabled.
+// Pull the provider list so we can preempt the click instead of relying on a post-hoc toast.
+const { data: enrichmentProviders } = useEnrichmentProviders()
+const hasEnabledEnrichment = computed(() =>
+  (enrichmentProviders.value ?? []).some(p => p.enabled)
+)
+
+// Per-provider history so the user can see WHICH providers ran and what each returned,
+// not just the final result the waterfall bubbled up.
+const { data: enrichmentHistory } = useEnrichmentResults(contactId)
+
 const { data: scoreHistory } = useLeadScoreHistory(contactId)
 const adjustScoreMutation = useAdjustScore()
 
 const adjustDialogOpen = ref(false)
 const adjustPoints = ref<number>(10)
 const adjustReason = ref('')
+const adjustErrors = useFieldErrors()
+
+// Touch-to-clear and reset-on-open.
+watch(adjustPoints, v => { if (v) adjustErrors.remove('adjustPoints') })
+watch(adjustDialogOpen, (open) => { if (open) adjustErrors.clear() })
 
 async function handleAdjustScore() {
   if (!contact.value) return
-  if (!adjustPoints.value) {
-    toast.error('Enter a points delta')
-    return
-  }
+  adjustErrors.clear()
+  if (!adjustPoints.value) adjustErrors.set('adjustPoints', 'Enter a points delta.')
+  if (Object.keys(adjustErrors.map).length) return
   try {
     await adjustScoreMutation.mutateAsync({
       contactId: contact.value.id,
@@ -53,8 +72,8 @@ async function handleAdjustScore() {
     adjustDialogOpen.value = false
     adjustPoints.value = 10
     adjustReason.value = ''
-  } catch {
-    toast.error('Failed to adjust score')
+  } catch (error: any) {
+    adjustErrors.fromServerError(error, 'Failed to adjust score')
   }
 }
 
@@ -63,16 +82,26 @@ async function handleEnrich() {
   try {
     const result = await enrichMutation.mutateAsync(contact.value.id)
     if (!result) {
-      toast.error('No enrichment providers are enabled. Configure them in Settings → Enrichment.')
+      toast.error('No enrichment providers are enabled.', {
+        description: 'Configure at least one in Enrichment settings.',
+        duration: Infinity,
+      })
     } else if (result.status === 'SUCCESS') {
       toast.success(`Enriched via ${result.providerKey}`)
     } else if (result.status === 'NOT_FOUND') {
-      toast.message('No data found for this contact')
+      toast.info('No data found for this contact', {
+        description: `Every enabled provider returned NOT_FOUND. Last tried: ${result.providerKey}`,
+        duration: 8000,
+      })
     } else {
-      toast.error(`Enrichment ${result.status.toLowerCase()}: ${result.errorMessage ?? ''}`)
+      // ERROR / RATE_LIMITED — surface the reason and don't auto-dismiss.
+      toast.error(`Enrichment ${result.status.toLowerCase()} (${result.providerKey})`, {
+        description: result.errorMessage ?? 'No details from provider',
+        duration: Infinity,
+      })
     }
   } catch (error: any) {
-    toast.error(error?.data?.error?.message || 'Enrichment failed')
+    toast.error(error?.data?.error?.message || 'Enrichment failed', { duration: Infinity })
   }
 }
 
@@ -93,11 +122,16 @@ const enrollableSequencesFiltered = computed(() => {
   return enrollableSequences.value.filter(s => !enrolledIds.has(s.id))
 })
 
+const enrollErrors = useFieldErrors()
+
+// Touch-to-clear and reset-on-open.
+watch(selectedSequenceId, v => { if (v) enrollErrors.remove('sequenceId') })
+watch(enrollDialogOpen, (open) => { if (open) enrollErrors.clear() })
+
 async function handleEnroll() {
-  if (!selectedSequenceId.value) {
-    toast.error('Please select a sequence')
-    return
-  }
+  enrollErrors.clear()
+  if (!selectedSequenceId.value) enrollErrors.set('sequenceId', 'Please select a sequence.')
+  if (Object.keys(enrollErrors.map).length) return
   try {
     await enrollMutation.mutateAsync({
       sequenceId: selectedSequenceId.value,
@@ -111,7 +145,7 @@ async function handleEnroll() {
     selectedSequenceId.value = ''
     selectedMailboxId.value = ''
   } catch (error: any) {
-    toast.error(error?.data?.error?.message || 'Failed to enroll contact')
+    enrollErrors.fromServerError(error, 'Failed to enroll contact')
   }
 }
 
@@ -245,15 +279,32 @@ function eventIconComponent(type: string) {
           </div>
 
           <div class="flex items-center gap-2 flex-wrap">
-            <Button
-              size="sm" variant="outline"
-              class="h-9 px-3 gap-1.5"
-              @click="handleEnrich"
-              :disabled="enrichMutation.isPending.value"
+            <Tooltip :delay-duration="150">
+              <TooltipTrigger>
+                <Button
+                  size="sm" variant="outline"
+                  class="h-9 px-3 gap-1.5"
+                  :disabled="enrichMutation.isPending.value || !hasEnabledEnrichment"
+                  @click="handleEnrich"
+                >
+                  <Sparkles class="h-3.5 w-3.5" />
+                  {{ enrichMutation.isPending.value ? 'Enriching…' : 'Enrich' }}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent v-if="!hasEnabledEnrichment">
+                No providers enabled — configure in Enrichment settings
+              </TooltipContent>
+              <TooltipContent v-else>
+                Run the enrichment waterfall for this contact
+              </TooltipContent>
+            </Tooltip>
+            <NuxtLink
+              v-if="!hasEnabledEnrichment"
+              to="/enrichment"
+              class="text-xs text-primary hover:underline"
             >
-              <Sparkles class="h-3.5 w-3.5" />
-              {{ enrichMutation.isPending.value ? 'Enriching…' : 'Enrich' }}
-            </Button>
+              Configure →
+            </NuxtLink>
 
             <Dialog v-model:open="enrollDialogOpen">
               <DialogTrigger as-child>
@@ -271,26 +322,37 @@ function eventIconComponent(type: string) {
                 </DialogHeader>
 
                 <div class="space-y-4">
+                  <div
+                    v-if="enrollErrors.has('_form')"
+                    class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+                  >
+                    {{ enrollErrors.get('_form') }}
+                  </div>
                   <div v-if="!contact.primaryEmail" class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                     This contact has no email address. Add one before enrolling.
                   </div>
 
                   <div class="space-y-2">
                     <Label for="sequence">Sequence</Label>
-                    <select
-                      id="sequence"
-                      v-model="selectedSequenceId"
-                      class="w-full rounded-md bg-background px-3 py-2 text-sm border border-input focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      <option value="">Select a sequence</option>
-                      <option
-                        v-for="seq in enrollableSequencesFiltered"
-                        :key="seq.id"
-                        :value="seq.id"
+                    <Select v-model="selectedSequenceId">
+                      <SelectTrigger
+                        id="sequence"
+                        class="w-full"
+                        :class="enrollErrors.has('sequenceId') ? 'border-destructive' : ''"
                       >
-                        {{ seq.name }} ({{ seq.steps.length }} steps)
-                      </option>
-                    </select>
+                        <SelectValue placeholder="Select a sequence" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          v-for="seq in enrollableSequencesFiltered"
+                          :key="seq.id"
+                          :value="seq.id"
+                        >
+                          {{ seq.name }} ({{ seq.steps.length }} steps)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <SharedFormError :message="enrollErrors.get('sequenceId')" />
                     <p v-if="!enrollableSequencesFiltered.length" class="text-xs text-muted-foreground">
                       No available sequences. Create and activate one, or this contact may already be enrolled everywhere.
                     </p>
@@ -298,16 +360,16 @@ function eventIconComponent(type: string) {
 
                   <div class="space-y-2">
                     <Label for="mailbox">Mailbox <span class="text-muted-foreground font-normal">(optional)</span></Label>
-                    <select
-                      id="mailbox"
-                      v-model="selectedMailboxId"
-                      class="w-full rounded-md bg-background px-3 py-2 text-sm border border-input focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      <option value="">Use sequence default</option>
-                      <option v-for="mb in mailboxes" :key="mb.id" :value="mb.id">
-                        {{ mb.name }} ({{ mb.email }})
-                      </option>
-                    </select>
+                    <Select v-model="selectedMailboxId">
+                      <SelectTrigger id="mailbox" class="w-full">
+                        <SelectValue placeholder="Use sequence default" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem v-for="mb in mailboxes" :key="mb.id" :value="mb.id">
+                          {{ mb.name }} ({{ mb.email }})
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -549,6 +611,49 @@ function eventIconComponent(type: string) {
         </ul>
       </div>
 
+      <!-- Enrichment history — one row per provider attempt. Makes it obvious WHICH
+           providers ran and why the waterfall fell through, rather than just the last one. -->
+      <div class="glass hairline rounded-xl overflow-hidden">
+        <div class="flex items-center gap-2 px-6 py-4" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+          <Sparkles class="h-4 w-4 text-muted-foreground" />
+          <h2 class="text-sm font-semibold tracking-tight">Enrichment history</h2>
+        </div>
+        <div v-if="!enrichmentHistory?.length" class="px-6 py-10 text-center text-sm text-muted-foreground">
+          No enrichment attempts yet. Click <span class="text-foreground">Enrich</span> to run the waterfall.
+        </div>
+        <ul v-else>
+          <li
+            v-for="r in enrichmentHistory"
+            :key="r.id"
+            class="px-6 py-3 flex items-start justify-between gap-4"
+            style="border-top: 1px solid hsl(240 5% 100% / 0.05);"
+          >
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-0.5">
+                <span class="font-medium text-sm">{{ r.providerKey }}</span>
+                <Badge
+                  :variant="r.status === 'SUCCESS' ? 'default'
+                    : r.status === 'NOT_FOUND' ? 'outline'
+                    : 'destructive'"
+                  class="text-xs"
+                >
+                  {{ r.status }}
+                </Badge>
+              </div>
+              <div class="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                <span v-if="r.foundEmail">Found: {{ r.foundEmail }}</span>
+                <span v-if="r.foundTitle">Title: {{ r.foundTitle }}</span>
+                <span v-if="r.confidenceScore !== null">Confidence: {{ r.confidenceScore }}</span>
+                <span v-if="r.errorMessage" class="text-destructive">{{ r.errorMessage }}</span>
+              </div>
+            </div>
+            <time class="text-xs text-muted-foreground whitespace-nowrap">
+              {{ formatDateString(r.enrichedAt) }}
+            </time>
+          </li>
+        </ul>
+      </div>
+
       <!-- Adjust score dialog -->
       <Dialog v-model:open="adjustDialogOpen">
         <DialogContent>
@@ -559,13 +664,21 @@ function eventIconComponent(type: string) {
             </DialogDescription>
           </DialogHeader>
           <div class="space-y-4">
+            <div
+              v-if="adjustErrors.has('_form')"
+              class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {{ adjustErrors.get('_form') }}
+            </div>
             <div class="space-y-2">
               <Label for="adjustPoints">Points</Label>
               <Input
                 id="adjustPoints"
                 v-model.number="adjustPoints"
                 type="number"
+                :class="adjustErrors.has('adjustPoints') ? 'border-destructive' : ''"
               />
+              <SharedFormError :message="adjustErrors.get('adjustPoints')" />
             </div>
             <div class="space-y-2">
               <Label for="adjustReason">Reason</Label>

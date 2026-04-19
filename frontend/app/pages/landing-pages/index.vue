@@ -21,12 +21,15 @@ const deleteMutation = useDeleteLandingPage()
 
 const dialogOpen = ref(false)
 const form = ref({ name: '', metaTitle: '' })
+const createErrors = useFieldErrors()
+
+watch(() => form.value.name, v => { if (v.trim()) createErrors.remove('name') })
+watch(dialogOpen, (open) => { if (open) createErrors.clear() })
 
 async function handleCreate() {
-  if (!form.value.name.trim()) {
-    toast.error('Name is required')
-    return
-  }
+  createErrors.clear()
+  if (!form.value.name.trim()) createErrors.set('name', 'Name is required.')
+  if (Object.keys(createErrors.map).length) return
   try {
     const page = await createMutation.mutateAsync({
       name: form.value.name,
@@ -38,7 +41,7 @@ async function handleCreate() {
     form.value = { name: '', metaTitle: '' }
     navigateTo(`/landing-pages/${page.id}/edit`)
   } catch (error: any) {
-    toast.error(error?.data?.error?.message || 'Failed to create page')
+    createErrors.fromServerError(error, 'Failed to create page')
   }
 }
 
@@ -96,9 +99,21 @@ function publicUrl(slug: string): string {
             <DialogTitle>Create Landing Page</DialogTitle>
           </DialogHeader>
           <div class="space-y-4">
+            <div
+              v-if="createErrors.has('_form')"
+              class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {{ createErrors.get('_form') }}
+            </div>
             <div class="space-y-2">
               <Label for="name">Name *</Label>
-              <Input id="name" v-model="form.name" placeholder="Q2 Campaign Landing" />
+              <Input
+                id="name"
+                v-model="form.name"
+                placeholder="Q2 Campaign Landing"
+                :class="createErrors.has('name') ? 'border-destructive' : ''"
+              />
+              <SharedFormError :message="createErrors.get('name')" />
             </div>
             <div class="space-y-2">
               <Label for="metaTitle">Meta Title (SEO)</Label>

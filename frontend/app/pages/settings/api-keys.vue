@@ -22,12 +22,18 @@ const revokeMutation = useRevokeApiKey()
 
 const createOpen = ref(false)
 const newName = ref('')
+const createErrors = useFieldErrors()
+
+watch(newName, v => { if (v.trim()) createErrors.remove('newName') })
+watch(createOpen, (open) => { if (open) createErrors.clear() })
 
 const revealOpen = ref(false)
 const revealedKey = ref<string>('')
 
 async function handleCreate() {
-  if (!newName.value.trim()) { toast.error('Name is required'); return }
+  createErrors.clear()
+  if (!newName.value.trim()) createErrors.set('newName', 'Name is required.')
+  if (Object.keys(createErrors.map).length) return
   try {
     const result = await createMutation.mutateAsync({ name: newName.value.trim() })
     revealedKey.value = result.plaintext ?? ''
@@ -35,7 +41,7 @@ async function handleCreate() {
     createOpen.value = false
     revealOpen.value = true
   } catch (error: any) {
-    toast.error(error?.data?.error?.message ?? 'Failed to create key')
+    createErrors.fromServerError(error, 'Failed to create key')
   }
 }
 
@@ -129,9 +135,22 @@ function formatDate(iso: string | null): string {
           </CardDescription>
         </DialogHeader>
         <div class="space-y-4">
+          <div
+            v-if="createErrors.has('_form')"
+            class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {{ createErrors.get('_form') }}
+          </div>
           <div class="space-y-2">
             <Label for="name">Name *</Label>
-            <Input id="name" v-model="newName" placeholder="e.g., My Chrome extension" @keyup.enter="handleCreate" />
+            <Input
+              id="name"
+              v-model="newName"
+              placeholder="e.g., My Chrome extension"
+              :class="createErrors.has('newName') ? 'border-destructive' : ''"
+              @keyup.enter="handleCreate"
+            />
+            <SharedFormError :message="createErrors.get('newName')" />
           </div>
         </div>
         <DialogFooter>

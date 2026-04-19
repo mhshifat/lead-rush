@@ -9,7 +9,7 @@ const props = defineProps<{ class?: HTMLAttributes["class"] }>()
   <div
     :class="
       cn(
-        'flex flex-col gap-y-1 mb-5 pb-4',
+        'flex flex-col gap-y-1 mb-6 pb-5',
         props.class,
       )
     "

@@ -109,6 +109,16 @@
 @layer utilities {
   .hairline { border: 1px solid hsl(240 5% 100% / 0.06); }
 
+  /* Hide scrollbars while keeping scroll functionality. Use on kanban rows,
+     horizontal carousels, etc. where the scrollbar itself would clutter the UI. */
+  .no-scrollbar {
+    scrollbar-width: none;         /* Firefox */
+    -ms-overflow-style: none;      /* IE / legacy Edge */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;                 /* Chrome / Safari / new Edge */
+  }
+
   /* Decorative glass — sits over the animated hero background on landing + auth
      pages where the blur + low alpha add atmosphere. Don't use for floating UI
      elements (dropdowns, popovers) — the transparency makes them hard to read

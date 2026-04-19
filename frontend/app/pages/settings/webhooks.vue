@@ -36,6 +36,10 @@ const form = ref<WebhookEndpointDto>({
   events: ['*'],
   enabled: true,
 })
+const errors = useFieldErrors()
+
+watch(() => form.value.url, v => { if (v?.trim()) errors.remove('url') })
+watch(() => form.value.events, v => { if (v?.length) errors.remove('events') }, { deep: true })
 
 const revealOpen = ref(false)
 const revealedSecret = ref('')
@@ -48,6 +52,7 @@ const { data: deliveries } = useWebhookDeliveries(selectedIdRef)
 function openCreate() {
   editingId.value = null
   form.value = { url: '', description: '', events: ['*'], enabled: true }
+  errors.clear()
   formOpen.value = true
 }
 
@@ -59,6 +64,7 @@ function openEdit(endpoint: WebhookEndpointApiDto) {
     events: endpoint.events.length ? [...endpoint.events] : ['*'],
     enabled: endpoint.enabled,
   }
+  errors.clear()
   formOpen.value = true
 }
 
@@ -81,13 +87,15 @@ function isSelected(topic: string): boolean {
 }
 
 async function handleSave() {
-  if (!form.value.url?.trim()) { toast.error('URL is required'); return }
-  if (!(form.value.events?.length)) { toast.error('Pick at least one event'); return }
+  errors.clear()
+  if (!form.value.url?.trim()) errors.set('url', 'URL is required.')
+  if (!(form.value.events?.length)) errors.set('events', 'Pick at least one event.')
+  if (Object.keys(errors.map).length) return
   try {
     const dto: WebhookEndpointDto = {
-      url: form.value.url.trim(),
+      url: form.value.url!.trim(),
       description: form.value.description?.trim() || undefined,
-      events: form.value.events,
+      events: form.value.events!,
       enabled: form.value.enabled,
     }
     if (editingId.value) {
@@ -100,7 +108,7 @@ async function handleSave() {
     }
     formOpen.value = false
   } catch (error: any) {
-    toast.error(error?.data?.error?.message ?? 'Failed to save')
+    errors.fromServerError(error, 'Failed to save')
   }
 }
 
@@ -299,9 +307,21 @@ function deliveryVariant(status: string): 'default' | 'secondary' | 'destructive
           <DialogTitle>{{ editingId ? 'Edit webhook' : 'New webhook' }}</DialogTitle>
         </DialogHeader>
         <div class="space-y-4">
+          <div
+            v-if="errors.has('_form')"
+            class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {{ errors.get('_form') }}
+          </div>
           <div class="space-y-2">
             <Label for="url">Endpoint URL *</Label>
-            <Input id="url" v-model="form.url" placeholder="https://api.yourapp.com/webhooks/leadrush" />
+            <Input
+              id="url"
+              v-model="form.url"
+              placeholder="https://api.yourapp.com/webhooks/leadrush"
+              :class="errors.has('url') ? 'border-destructive' : ''"
+            />
+            <SharedFormError :message="errors.get('url')" />
           </div>
           <div class="space-y-2">
             <Label for="desc">Description</Label>
@@ -310,7 +330,10 @@ function deliveryVariant(status: string): 'default' | 'secondary' | 'destructive
 
           <div class="space-y-2">
             <Label>Events</Label>
-            <div class="flex flex-wrap gap-1.5">
+            <div
+              class="flex flex-wrap gap-1.5 rounded-md"
+              :class="errors.has('events') ? 'border border-destructive p-2' : ''"
+            >
               <button
                 type="button"
                 class="px-2.5 py-1 rounded-full text-xs font-mono transition-colors"
@@ -327,6 +350,7 @@ function deliveryVariant(status: string): 'default' | 'secondary' | 'destructive
                 :disabled="isSelected('*')"
               >{{ topic }}</button>
             </div>
+            <SharedFormError :message="errors.get('events')" />
           </div>
 
           <label class="flex items-center gap-2 text-sm">

@@ -50,6 +50,7 @@ public class EnrichmentWaterfallService {
     private final EnrichmentProviderRepository providerRepository;
     private final EnrichmentResultRepository resultRepository;
     private final EncryptionService encryptionService;
+    private final DomainPatternCacheService patternCacheService;
 
     /**
      * Attempt to enrich a contact. Returns the FIRST successful result,
@@ -114,8 +115,17 @@ public class EnrichmentWaterfallService {
             result = resultRepository.save(result);
             lastResult = result;
 
-            // SUCCESS → stop the waterfall (we have what we need)
+            // SUCCESS → learn the pattern for this domain, then stop the waterfall
             if (result.getStatus() == EnrichmentResult.ResultStatus.SUCCESS) {
+                if (result.getFoundEmail() != null && request.companyDomain() != null) {
+                    patternCacheService.recordDiscoveredEmail(
+                            workspaceId,
+                            request.firstName(),
+                            request.lastName(),
+                            request.companyDomain(),
+                            result.getFoundEmail(),
+                            config.getProviderKey());
+                }
                 log.info("Enrichment SUCCESS via {} for contact {}",
                         config.getProviderKey(), contact.getId());
                 return result;

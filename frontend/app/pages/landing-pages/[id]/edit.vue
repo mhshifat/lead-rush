@@ -1,38 +1,23 @@
-<!--
-  Block Editor — create/edit a landing page's blocks.
-
-  LAYOUT:
-    Left panel:  Block palette (click to add)
-    Center:      Live preview + click a block to select it
-    Right panel: Properties of the selected block (edit title, subtitle, image URL, etc.)
-
-  DATA FLOW:
-    Page is loaded with `blocks` = JSON array of { id, type, props }
-    We store it as a reactive array locally (`blocks`)
-    Click "Save" → PUT /landing-pages/{id} with JSON.stringify(blocks)
-    Click "Publish" → POST /landing-pages/{id}/publish
-
-  BLOCK TYPES:
-    hero     — title + subtitle + CTA button
-    text     — paragraph text (simple)
-    image    — img src + alt text
-    form     — references a form_id, shows a dropdown of forms to pick
-    cta      — standalone button block
--->
 <script setup lang="ts">
-import { Card, CardContent } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Badge } from '~/components/ui/badge'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '~/components/ui/select'
 import { toast } from 'vue-sonner'
+import {
+  ArrowLeft, ArrowUpRight, Save, Send, EyeOff,
+  LayoutPanelTop, AlignLeft, Image as ImageIcon, ClipboardList, MousePointer,
+  ChevronUp, ChevronDown, X, MousePointerClick, Settings, SlidersHorizontal, AlertCircle,
+} from 'lucide-vue-next'
 
 definePageMeta({
   middleware: 'auth',
   layout: 'default',
 })
 
-// ── Page state ──
 const route = useRoute()
 const pageId = computed(() => route.params.id as string)
 
@@ -41,7 +26,6 @@ const { data: forms } = useForms()
 const updateMutation = useUpdateLandingPage()
 const publishMutation = usePublishLandingPage()
 
-// ── Block types (block palette) ──
 type BlockType = 'hero' | 'text' | 'image' | 'form' | 'cta'
 
 interface Block {
@@ -50,27 +34,34 @@ interface Block {
   props: Record<string, any>
 }
 
-const blockDefinitions: Array<{ type: BlockType; icon: string; label: string; defaultProps: Record<string, any> }> = [
+// Lucide icon map — one proper icon per block type so the palette doesn't
+// rely on emoji (which render inconsistently across OSes).
+const blockIcon: Record<BlockType, any> = {
+  hero: LayoutPanelTop,
+  text: AlignLeft,
+  image: ImageIcon,
+  form: ClipboardList,
+  cta: MousePointer,
+}
+
+const blockDefinitions: Array<{ type: BlockType; label: string; defaultProps: Record<string, any> }> = [
   {
     type: 'hero',
-    icon: '🎯',
     label: 'Hero',
     defaultProps: {
-      title: 'Your Headline',
+      title: 'Your headline',
       subtitle: 'A supporting subheadline goes here.',
-      ctaText: 'Get Started',
+      ctaText: 'Get started',
       ctaUrl: '#',
     },
   },
   {
     type: 'text',
-    icon: '📝',
     label: 'Text',
     defaultProps: { content: 'Add your text content here.' },
   },
   {
     type: 'image',
-    icon: '🖼️',
     label: 'Image',
     defaultProps: {
       src: 'https://via.placeholder.com/800x400',
@@ -79,19 +70,16 @@ const blockDefinitions: Array<{ type: BlockType; icon: string; label: string; de
   },
   {
     type: 'form',
-    icon: '📋',
     label: 'Form',
     defaultProps: { formId: '', submitText: 'Submit' },
   },
   {
     type: 'cta',
-    icon: '🔘',
     label: 'CTA Button',
     defaultProps: { text: 'Click here', url: '#' },
   },
 ]
 
-// ── Local state — reactive copy of the page's blocks ──
 const blocks = ref<Block[]>([])
 const selectedBlockId = ref<string | null>(null)
 const pageName = ref('')
@@ -99,7 +87,6 @@ const pageSlug = ref('')
 const metaTitle = ref('')
 const metaDescription = ref('')
 
-// Sync local state from server data when page loads
 watch(page, (loaded) => {
   if (!loaded) return
   pageName.value = loaded.name
@@ -107,7 +94,6 @@ watch(page, (loaded) => {
   metaTitle.value = loaded.metaTitle ?? ''
   metaDescription.value = loaded.metaDescription ?? ''
   try {
-    // backend returns blocks as a JSON object (via @JsonRawValue) or string
     const parsed = typeof loaded.blocks === 'string'
       ? JSON.parse(loaded.blocks)
       : (loaded.blocks ?? [])
@@ -121,7 +107,6 @@ const selectedBlock = computed(() =>
   blocks.value.find(b => b.id === selectedBlockId.value) ?? null
 )
 
-// ── Block operations ──
 function addBlock(type: BlockType) {
   const def = blockDefinitions.find(d => d.type === type)!
   const newBlock: Block = {
@@ -157,7 +142,6 @@ function updateBlockProp(key: string, value: any) {
   selectedBlock.value.props[key] = value
 }
 
-// ── Save & publish ──
 async function handleSave() {
   try {
     await updateMutation.mutateAsync({
@@ -179,7 +163,6 @@ async function handleSave() {
 async function handleTogglePublish() {
   if (!page.value) return
   try {
-    // Save first to make sure latest blocks go live
     await updateMutation.mutateAsync({
       id: pageId.value,
       dto: {
@@ -209,20 +192,32 @@ function publicUrl(): string {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <NuxtLink to="/landing-pages" class="text-sm text-muted-foreground hover:text-foreground">
-      ← Back to pages
+  <div class="space-y-5 enter-fade-up">
+    <!-- Back link -->
+    <NuxtLink
+      to="/landing-pages"
+      class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+    >
+      <ArrowLeft class="h-3.5 w-3.5" />
+      Back to pages
     </NuxtLink>
 
-    <div v-if="isLoading" class="text-center py-8 text-muted-foreground">Loading...</div>
+    <!-- Loading / not-found -->
+    <div v-if="isLoading" class="glass hairline rounded-xl py-16 text-center text-sm text-muted-foreground">
+      Loading…
+    </div>
+    <div v-else-if="!page" class="glass hairline rounded-xl py-16 text-center text-sm text-destructive">
+      Page not found
+    </div>
 
-    <div v-else-if="!page" class="text-center py-8 text-destructive">Page not found</div>
-
-    <div v-else class="space-y-4">
+    <div v-else class="space-y-5">
       <!-- Top bar -->
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <Input v-model="pageName" class="text-lg font-bold w-64" />
+      <div class="glass hairline rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <Input
+            v-model="pageName"
+            class="text-base font-semibold h-9 max-w-xs border-transparent bg-transparent hover:border-input focus:border-input"
+          />
           <Badge :variant="page.status === 'PUBLISHED' ? 'default' : 'secondary'">
             {{ page.status }}
           </Badge>
@@ -232,231 +227,332 @@ function publicUrl(): string {
             v-if="page.status === 'PUBLISHED'"
             :href="publicUrl()"
             target="_blank"
-            class="text-sm text-primary hover:underline"
+            class="inline-flex items-center gap-1 text-sm text-primary hover:underline mr-2"
           >
-            View live page ↗
+            View live
+            <ArrowUpRight class="h-3.5 w-3.5" />
           </a>
-          <Button variant="outline" @click="handleSave" :disabled="updateMutation.isPending.value">
-            {{ updateMutation.isPending.value ? 'Saving...' : 'Save' }}
+          <Button
+            variant="outline"
+            class="gap-1.5"
+            :disabled="updateMutation.isPending.value"
+            @click="handleSave"
+          >
+            <Save class="h-3.5 w-3.5" />
+            {{ updateMutation.isPending.value ? 'Saving…' : 'Save' }}
           </Button>
-          <Button @click="handleTogglePublish" :disabled="publishMutation.isPending.value">
+          <Button
+            class="gap-1.5"
+            :disabled="publishMutation.isPending.value"
+            @click="handleTogglePublish"
+          >
+            <component :is="page.status === 'DRAFT' ? Send : EyeOff" class="h-3.5 w-3.5" />
             {{ page.status === 'DRAFT' ? 'Publish' : 'Unpublish' }}
           </Button>
         </div>
       </div>
 
-      <!-- Three-column editor layout -->
+      <!-- Three-column editor -->
       <div class="grid grid-cols-12 gap-4" style="min-height: 600px;">
-        <!-- LEFT: Block palette + page settings -->
+        <!-- LEFT: block palette + page settings -->
         <div class="col-span-3 space-y-4">
-          <Card>
-            <CardContent class="p-4 space-y-3">
-              <h3 class="text-sm font-medium">Add Block</h3>
-              <div class="grid grid-cols-2 gap-2">
-                <button
-                  v-for="def in blockDefinitions"
-                  :key="def.type"
-                  class="p-3 border rounded-md text-center hover:border-primary hover:bg-muted/50 transition"
-                  @click="addBlock(def.type)"
-                >
-                  <div class="text-2xl">{{ def.icon }}</div>
-                  <div class="text-xs mt-1">{{ def.label }}</div>
-                </button>
+          <!-- Block palette -->
+          <div class="glass hairline rounded-xl overflow-hidden">
+            <div class="px-4 py-3" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+              <div class="flex items-center gap-2">
+                <MousePointerClick class="h-4 w-4 text-muted-foreground" />
+                <h3 class="text-sm font-semibold tracking-tight">Add block</h3>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div class="p-3 grid grid-cols-2 gap-2">
+              <button
+                v-for="def in blockDefinitions"
+                :key="def.type"
+                type="button"
+                class="group flex flex-col items-center gap-1.5 rounded-lg hairline py-3 px-2 text-muted-foreground hover:text-foreground hover:bg-white/5 hover:border-primary/40 transition-colors"
+                @click="addBlock(def.type)"
+              >
+                <component :is="blockIcon[def.type]" class="h-4 w-4" />
+                <span class="text-xs">{{ def.label }}</span>
+              </button>
+            </div>
+          </div>
 
-          <Card>
-            <CardContent class="p-4 space-y-3">
-              <h3 class="text-sm font-medium">Page Settings</h3>
-              <div class="space-y-2">
-                <Label for="slug">URL Slug</Label>
-                <Input id="slug" v-model="pageSlug" />
-                <p class="text-xs text-muted-foreground">/p/{{ pageSlug }}</p>
+          <!-- Page settings -->
+          <div class="glass hairline rounded-xl overflow-hidden">
+            <div class="px-4 py-3" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+              <div class="flex items-center gap-2">
+                <Settings class="h-4 w-4 text-muted-foreground" />
+                <h3 class="text-sm font-semibold tracking-tight">Page settings</h3>
               </div>
-              <div class="space-y-2">
-                <Label for="metaTitle">Meta Title</Label>
-                <Input id="metaTitle" v-model="metaTitle" />
+            </div>
+            <div class="p-4 space-y-3">
+              <div class="space-y-1.5">
+                <Label for="slug" class="text-xs">URL slug</Label>
+                <Input id="slug" v-model="pageSlug" class="h-9" />
+                <p class="text-xs text-muted-foreground font-mono truncate">/p/{{ pageSlug }}</p>
               </div>
-              <div class="space-y-2">
-                <Label for="metaDescription">Meta Description</Label>
-                <Input id="metaDescription" v-model="metaDescription" />
+              <div class="space-y-1.5">
+                <Label for="metaTitle" class="text-xs">Meta title</Label>
+                <Input id="metaTitle" v-model="metaTitle" class="h-9" placeholder="SEO title" />
               </div>
-            </CardContent>
-          </Card>
+              <div class="space-y-1.5">
+                <Label for="metaDescription" class="text-xs">Meta description</Label>
+                <Input id="metaDescription" v-model="metaDescription" class="h-9" placeholder="SEO description" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- CENTER: Preview / block list -->
+        <!-- CENTER: preview / block list -->
         <div class="col-span-6">
-          <Card>
-            <CardContent class="p-4">
-              <h3 class="text-sm font-medium mb-3">Preview</h3>
-              <div
-                v-if="!blocks.length"
-                class="text-center py-16 text-sm text-muted-foreground border-2 border-dashed rounded-md"
-              >
-                Click a block in the left panel to start building your page.
+          <div class="glass hairline rounded-xl overflow-hidden flex flex-col h-full">
+            <div class="px-4 py-3 flex items-center justify-between" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+              <h3 class="text-sm font-semibold tracking-tight">Preview</h3>
+              <span class="text-xs text-muted-foreground">
+                {{ blocks.length }} {{ blocks.length === 1 ? 'block' : 'blocks' }}
+              </span>
+            </div>
+
+            <!-- Empty state -->
+            <div
+              v-if="!blocks.length"
+              class="flex-1 flex flex-col items-center justify-center py-16 px-6 text-center"
+            >
+              <div class="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                <LayoutPanelTop class="h-5 w-5 text-muted-foreground" />
               </div>
-              <div v-else class="space-y-2">
-                <div
-                  v-for="(block, idx) in blocks"
-                  :key="block.id"
-                  class="p-3 rounded-md border cursor-pointer transition"
-                  :class="selectedBlockId === block.id ? 'border-primary ring-2 ring-primary/20' : 'hover:border-primary/50'"
-                  @click="selectedBlockId = block.id"
-                >
-                  <div class="flex items-center justify-between mb-1">
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm">{{ blockDefinitions.find(d => d.type === block.type)?.icon }}</span>
-                      <span class="text-xs font-medium uppercase">{{ block.type }}</span>
-                    </div>
-                    <div class="flex gap-1" @click.stop>
-                      <button
-                        class="text-xs text-muted-foreground hover:text-foreground p-1"
-                        :disabled="idx === 0"
-                        @click="moveBlock(block.id, 'up')"
-                      >↑</button>
-                      <button
-                        class="text-xs text-muted-foreground hover:text-foreground p-1"
-                        :disabled="idx === blocks.length - 1"
-                        @click="moveBlock(block.id, 'down')"
-                      >↓</button>
-                      <button
-                        class="text-xs text-muted-foreground hover:text-destructive p-1"
-                        @click="removeBlock(block.id)"
-                      >✕</button>
-                    </div>
-                  </div>
+              <h4 class="text-sm font-semibold tracking-tight">Start with a block</h4>
+              <p class="text-sm text-muted-foreground mt-1 max-w-xs">
+                Pick from the left panel to drop a hero, text, image, form, or CTA into the page.
+              </p>
+            </div>
 
-                  <!-- Block preview rendering -->
-                  <div v-if="block.type === 'hero'" class="py-4 text-center">
-                    <h2 class="text-xl font-bold">{{ block.props.title }}</h2>
-                    <p class="text-sm text-muted-foreground mt-1">{{ block.props.subtitle }}</p>
-                    <button class="mt-2 px-3 py-1 text-xs rounded bg-primary text-primary-foreground">
-                      {{ block.props.ctaText }}
-                    </button>
-                  </div>
-
-                  <div v-else-if="block.type === 'text'" class="text-sm">
-                    {{ block.props.content }}
-                  </div>
-
-                  <div v-else-if="block.type === 'image'" class="flex justify-center">
-                    <img :src="block.props.src" :alt="block.props.alt" class="max-h-32 object-contain rounded" />
-                  </div>
-
-                  <div v-else-if="block.type === 'form'" class="text-xs text-muted-foreground">
-                    <span v-if="block.props.formId">
-                      Form: <strong>{{ forms?.find(f => f.id === block.props.formId)?.name ?? 'Unknown' }}</strong>
+            <!-- Block list -->
+            <div v-else class="p-4 space-y-2">
+              <div
+                v-for="(block, idx) in blocks"
+                :key="block.id"
+                class="rounded-lg hairline p-3 cursor-pointer transition-colors"
+                :class="selectedBlockId === block.id
+                  ? 'ring-2 ring-primary/40 bg-primary/5'
+                  : 'hover:bg-white/5'"
+                @click="selectedBlockId = block.id"
+              >
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <component :is="blockIcon[block.type]" class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span class="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                      {{ block.type }}
                     </span>
-                    <span v-else class="text-destructive">⚠️ No form selected</span>
                   </div>
-
-                  <div v-else-if="block.type === 'cta'" class="text-center py-2">
-                    <button class="px-4 py-2 rounded bg-primary text-primary-foreground text-sm">
-                      {{ block.props.text }}
+                  <div class="flex items-center gap-0.5" @click.stop>
+                    <button
+                      class="h-6 w-6 rounded-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Move up"
+                      :disabled="idx === 0"
+                      @click="moveBlock(block.id, 'up')"
+                    >
+                      <ChevronUp class="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      class="h-6 w-6 rounded-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Move down"
+                      :disabled="idx === blocks.length - 1"
+                      @click="moveBlock(block.id, 'down')"
+                    >
+                      <ChevronDown class="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      class="h-6 w-6 rounded-sm flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      title="Remove block"
+                      @click="removeBlock(block.id)"
+                    >
+                      <X class="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
+
+                <!-- Block preview rendering -->
+                <div v-if="block.type === 'hero'" class="py-4 text-center">
+                  <h2 class="text-xl font-bold">{{ block.props.title }}</h2>
+                  <p class="text-sm text-muted-foreground mt-1">{{ block.props.subtitle }}</p>
+                  <button class="mt-3 px-3 py-1 text-xs rounded bg-primary text-primary-foreground">
+                    {{ block.props.ctaText }}
+                  </button>
+                </div>
+
+                <div v-else-if="block.type === 'text'" class="text-sm">
+                  {{ block.props.content }}
+                </div>
+
+                <div v-else-if="block.type === 'image'" class="flex justify-center">
+                  <img :src="block.props.src" :alt="block.props.alt" class="max-h-32 object-contain rounded" />
+                </div>
+
+                <div v-else-if="block.type === 'form'" class="text-xs text-muted-foreground">
+                  <template v-if="block.props.formId">
+                    Form: <strong class="text-foreground">{{ forms?.find(f => f.id === block.props.formId)?.name ?? 'Unknown' }}</strong>
+                  </template>
+                  <span v-else class="inline-flex items-center gap-1 text-destructive">
+                    <AlertCircle class="h-3 w-3" />
+                    No form selected
+                  </span>
+                </div>
+
+                <div v-else-if="block.type === 'cta'" class="text-center py-2">
+                  <button class="px-4 py-2 rounded bg-primary text-primary-foreground text-sm">
+                    {{ block.props.text }}
+                  </button>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
-        <!-- RIGHT: Selected block properties -->
+        <!-- RIGHT: selected block properties -->
         <div class="col-span-3">
-          <Card>
-            <CardContent class="p-4">
-              <h3 class="text-sm font-medium mb-3">
-                {{ selectedBlock ? selectedBlock.type.toUpperCase() + ' Properties' : 'Properties' }}
-              </h3>
-
-              <div v-if="!selectedBlock" class="text-xs text-muted-foreground">
-                Click a block in the preview to edit it.
+          <div class="glass hairline rounded-xl overflow-hidden">
+            <div class="px-4 py-3" style="border-bottom: 1px solid hsl(240 5% 100% / 0.06);">
+              <div class="flex items-center gap-2">
+                <SlidersHorizontal class="h-4 w-4 text-muted-foreground" />
+                <h3 class="text-sm font-semibold tracking-tight">
+                  {{ selectedBlock ? selectedBlock.type.toUpperCase() + ' properties' : 'Properties' }}
+                </h3>
               </div>
+            </div>
 
-              <div v-else class="space-y-3">
-                <!-- Hero props -->
-                <template v-if="selectedBlock.type === 'hero'">
-                  <div class="space-y-1">
-                    <Label>Title</Label>
-                    <Input :model-value="selectedBlock.props.title" @update:model-value="updateBlockProp('title', $event)" />
-                  </div>
-                  <div class="space-y-1">
-                    <Label>Subtitle</Label>
-                    <Input :model-value="selectedBlock.props.subtitle" @update:model-value="updateBlockProp('subtitle', $event)" />
-                  </div>
-                  <div class="space-y-1">
-                    <Label>CTA Text</Label>
-                    <Input :model-value="selectedBlock.props.ctaText" @update:model-value="updateBlockProp('ctaText', $event)" />
-                  </div>
-                  <div class="space-y-1">
-                    <Label>CTA URL</Label>
-                    <Input :model-value="selectedBlock.props.ctaUrl" @update:model-value="updateBlockProp('ctaUrl', $event)" />
-                  </div>
-                </template>
-
-                <!-- Text props -->
-                <template v-else-if="selectedBlock.type === 'text'">
-                  <div class="space-y-1">
-                    <Label>Content</Label>
-                    <textarea
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      rows="6"
-                      :value="selectedBlock.props.content"
-                      @input="updateBlockProp('content', ($event.target as HTMLTextAreaElement).value)"
-                    />
-                  </div>
-                </template>
-
-                <!-- Image props -->
-                <template v-else-if="selectedBlock.type === 'image'">
-                  <div class="space-y-1">
-                    <Label>Image URL</Label>
-                    <Input :model-value="selectedBlock.props.src" @update:model-value="updateBlockProp('src', $event)" />
-                  </div>
-                  <div class="space-y-1">
-                    <Label>Alt Text</Label>
-                    <Input :model-value="selectedBlock.props.alt" @update:model-value="updateBlockProp('alt', $event)" />
-                  </div>
-                </template>
-
-                <!-- Form props -->
-                <template v-else-if="selectedBlock.type === 'form'">
-                  <div class="space-y-1">
-                    <Label>Form</Label>
-                    <select
-                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      :value="selectedBlock.props.formId"
-                      @change="updateBlockProp('formId', ($event.target as HTMLSelectElement).value)"
-                    >
-                      <option value="">Select a form</option>
-                      <option v-for="f in forms" :key="f.id" :value="f.id">{{ f.name }}</option>
-                    </select>
-                    <NuxtLink v-if="!forms?.length" to="/forms" class="text-xs text-primary hover:underline">
-                      Create a form first →
-                    </NuxtLink>
-                  </div>
-                  <div class="space-y-1">
-                    <Label>Submit Button Text</Label>
-                    <Input :model-value="selectedBlock.props.submitText" @update:model-value="updateBlockProp('submitText', $event)" />
-                  </div>
-                </template>
-
-                <!-- CTA props -->
-                <template v-else-if="selectedBlock.type === 'cta'">
-                  <div class="space-y-1">
-                    <Label>Button Text</Label>
-                    <Input :model-value="selectedBlock.props.text" @update:model-value="updateBlockProp('text', $event)" />
-                  </div>
-                  <div class="space-y-1">
-                    <Label>URL</Label>
-                    <Input :model-value="selectedBlock.props.url" @update:model-value="updateBlockProp('url', $event)" />
-                  </div>
-                </template>
+            <div v-if="!selectedBlock" class="p-6 text-center">
+              <div class="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3">
+                <SlidersHorizontal class="h-4 w-4 text-muted-foreground" />
               </div>
-            </CardContent>
-          </Card>
+              <p class="text-xs text-muted-foreground">
+                Click a block in the preview to edit its properties here.
+              </p>
+            </div>
+
+            <div v-else class="p-4 space-y-3">
+              <!-- Hero -->
+              <template v-if="selectedBlock.type === 'hero'">
+                <div class="space-y-1.5">
+                  <Label class="text-xs">Title</Label>
+                  <Input
+                    class="h-9"
+                    :model-value="selectedBlock.props.title"
+                    @update:model-value="updateBlockProp('title', $event)"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <Label class="text-xs">Subtitle</Label>
+                  <Input
+                    class="h-9"
+                    :model-value="selectedBlock.props.subtitle"
+                    @update:model-value="updateBlockProp('subtitle', $event)"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <Label class="text-xs">CTA text</Label>
+                  <Input
+                    class="h-9"
+                    :model-value="selectedBlock.props.ctaText"
+                    @update:model-value="updateBlockProp('ctaText', $event)"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <Label class="text-xs">CTA URL</Label>
+                  <Input
+                    class="h-9"
+                    :model-value="selectedBlock.props.ctaUrl"
+                    @update:model-value="updateBlockProp('ctaUrl', $event)"
+                  />
+                </div>
+              </template>
+
+              <!-- Text -->
+              <template v-else-if="selectedBlock.type === 'text'">
+                <div class="space-y-1.5">
+                  <Label class="text-xs">Content</Label>
+                  <textarea
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    rows="6"
+                    :value="selectedBlock.props.content"
+                    @input="updateBlockProp('content', ($event.target as HTMLTextAreaElement).value)"
+                  />
+                </div>
+              </template>
+
+              <!-- Image -->
+              <template v-else-if="selectedBlock.type === 'image'">
+                <div class="space-y-1.5">
+                  <Label class="text-xs">Image URL</Label>
+                  <Input
+                    class="h-9"
+                    :model-value="selectedBlock.props.src"
+                    @update:model-value="updateBlockProp('src', $event)"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <Label class="text-xs">Alt text</Label>
+                  <Input
+                    class="h-9"
+                    :model-value="selectedBlock.props.alt"
+                    @update:model-value="updateBlockProp('alt', $event)"
+                  />
+                </div>
+              </template>
+
+              <!-- Form -->
+              <template v-else-if="selectedBlock.type === 'form'">
+                <div class="space-y-1.5">
+                  <Label class="text-xs">Form</Label>
+                  <Select
+                    :model-value="selectedBlock.props.formId"
+                    @update:model-value="updateBlockProp('formId', $event)"
+                  >
+                    <SelectTrigger class="h-9 w-full">
+                      <SelectValue placeholder="Select a form" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="f in forms" :key="f.id" :value="f.id">
+                        {{ f.name }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <NuxtLink v-if="!forms?.length" to="/forms" class="text-xs text-primary hover:underline">
+                    Create a form first →
+                  </NuxtLink>
+                </div>
+                <div class="space-y-1.5">
+                  <Label class="text-xs">Submit button text</Label>
+                  <Input
+                    class="h-9"
+                    :model-value="selectedBlock.props.submitText"
+                    @update:model-value="updateBlockProp('submitText', $event)"
+                  />
+                </div>
+              </template>
+
+              <!-- CTA -->
+              <template v-else-if="selectedBlock.type === 'cta'">
+                <div class="space-y-1.5">
+                  <Label class="text-xs">Button text</Label>
+                  <Input
+                    class="h-9"
+                    :model-value="selectedBlock.props.text"
+                    @update:model-value="updateBlockProp('text', $event)"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <Label class="text-xs">URL</Label>
+                  <Input
+                    class="h-9"
+                    :model-value="selectedBlock.props.url"
+                    @update:model-value="updateBlockProp('url', $event)"
+                  />
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
       </div>
     </div>

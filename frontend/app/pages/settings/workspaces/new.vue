@@ -15,9 +15,14 @@ const name = ref('')
 const authStore = useAuthStore()
 const queryClient = useQueryClient()
 const createMutation = useCreateWorkspace()
+const errors = useFieldErrors()
+
+watch(name, v => { if (v.trim()) errors.remove('name') })
 
 async function handleCreate() {
-  if (!name.value.trim()) { toast.error('Name is required'); return }
+  errors.clear()
+  if (!name.value.trim()) errors.set('name', 'Name is required.')
+  if (Object.keys(errors.map).length) return
   try {
     const created = await createMutation.mutateAsync({ name: name.value.trim() })
     await authStore.switchWorkspace(created.id)
@@ -25,7 +30,7 @@ async function handleCreate() {
     toast.success(`Created ${created.name}`)
     await navigateTo('/dashboard')
   } catch (error: any) {
-    toast.error(error?.data?.error?.message ?? 'Failed to create workspace')
+    errors.fromServerError(error, 'Failed to create workspace')
   }
 }
 </script>
@@ -44,9 +49,21 @@ async function handleCreate() {
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
+        <div
+          v-if="errors.has('_form')"
+          class="rounded-md bg-destructive/10 p-4 text-sm text-destructive"
+        >
+          {{ errors.get('_form') }}
+        </div>
         <div class="space-y-2">
           <Label for="name">Name *</Label>
-          <Input id="name" v-model="name" placeholder="Acme Inc." />
+          <Input
+            id="name"
+            v-model="name"
+            placeholder="Acme Inc."
+            :class="errors.has('name') ? 'border-destructive' : ''"
+          />
+          <SharedFormError :message="errors.get('name')" />
         </div>
         <div class="flex justify-end gap-2">
           <Button variant="outline" @click="navigateTo('/settings/team')">Cancel</Button>
