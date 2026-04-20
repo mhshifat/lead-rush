@@ -10,7 +10,7 @@
     <Toaster
       position="bottom-right"
       :duration="5000"
-      :toast-options="{ style: 'z-index: 9999' }"
+      :toast-options="{ style: { zIndex: 9999 } }"
     />
     <SharedConfirmDialog />
   </TooltipProvider>
