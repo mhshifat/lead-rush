@@ -30,8 +30,12 @@ public class TransactionalEmailService {
     @Value("${spring.mail.host:}")
     private String smtpHost;
 
+    // Stored as String (not int) on purpose: if a deploy env sets SMTP_PORT to
+    // something unparseable (e.g. a placeholder like "test"), the app still
+    // boots — email sending just skips with a warning instead of crashing the
+    // entire bean graph. Parsed lazily inside sendTransactional().
     @Value("${spring.mail.port:587}")
-    private int smtpPort;
+    private String smtpPort;
 
     @Value("${spring.mail.username:}")
     private String smtpUsername;
@@ -97,8 +101,9 @@ public class TransactionalEmailService {
             return;
         }
 
+        int port = parsePortOrDefault(smtpPort);
         var credentials = new EmailSenderAdapter.SmtpCredentials(
-                smtpHost, smtpPort, smtpUsername, smtpPassword, smtpStartTls, smtpAuth);
+                smtpHost, port, smtpUsername, smtpPassword, smtpStartTls, smtpAuth);
 
         var request = new EmailSenderAdapter.SendRequest(
                 credentials, fromAddress, fromName, to, subject, bodyHtml, bodyText);
@@ -111,6 +116,23 @@ public class TransactionalEmailService {
             log.warn("Failed to send transactional email to {}: {}", to, result.errorMessage());
             throw new com.leadrush.common.exception.BusinessException(
                     "Could not send email. Please try again in a moment.");
+        }
+    }
+
+    /**
+     * Tolerant port parser. If an operator set SMTP_PORT to something
+     * unparseable in the dashboard, we log once and fall back to 587 (submission)
+     * rather than crashing the request. 587 works for TLS-capable providers
+     * and fails fast at the socket level if the real port differs, which
+     * produces a much clearer error than a boot-time bean-wiring crash.
+     */
+    private int parsePortOrDefault(String raw) {
+        if (raw == null || raw.isBlank()) return 587;
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            log.warn("SMTP_PORT='{}' is not a number — falling back to 587.", raw);
+            return 587;
         }
     }
 
