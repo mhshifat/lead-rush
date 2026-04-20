@@ -7,6 +7,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -21,8 +22,20 @@ public class CorsConfig {
     // shows up as a generic "CORS error" in the browser).
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        // FRONTEND_URL may be a single origin or a comma-separated list. The list
+        // form is how Vercel preview deployments (per-branch URLs) get allowed
+        // alongside the production domain — e.g. "https://app.leadrush.com,https://*.vercel.app".
+        // Entries with "*" are treated as patterns; plain URLs go through as exact origins.
+        List<String> configured = Arrays.stream(properties.getFrontendUrl().split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        List<String> exactOrigins = configured.stream().filter(s -> !s.contains("*")).toList();
+        List<String> patternOrigins = configured.stream().filter(s -> s.contains("*")).toList();
+
         CorsConfiguration app = new CorsConfiguration();
-        app.setAllowedOrigins(List.of(properties.getFrontendUrl()));
+        if (!exactOrigins.isEmpty()) app.setAllowedOrigins(exactOrigins);
+        if (!patternOrigins.isEmpty()) app.setAllowedOriginPatterns(patternOrigins);
         app.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         app.setAllowedHeaders(List.of("*"));
         app.setAllowCredentials(true);
