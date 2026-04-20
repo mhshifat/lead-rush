@@ -1,0 +1,56 @@
+# ────────────────────────────────────────────
+# Lead Rush — Production profile
+# Activated via SPRING_PROFILES_ACTIVE=prod on Render / Fly / OCI.
+# ────────────────────────────────────────────
+#
+# Expected environment variables (all REQUIRED unless noted):
+#
+#   DATABASE_URL      Render supplies "postgres://..." — we normalise to jdbc:postgresql:// below.
+#                     Accepts either shape, plus the "jdbc:postgresql://..." long form.
+#   REDIS_URL         Render key-value service; "redis://..." form.
+#   JWT_SECRET        Render generateValue (render.yaml) or hand-generated (>= 32 chars).
+#   ENCRYPTION_KEY    For mailbox credential encryption (>= 32 chars).
+#   FRONTEND_URL      Public URL of the Nuxt service; used to build absolute links.
+#   SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD   (optional — required to send email)
+#   GROQ_API_KEY      (optional — AI opener + email writer refuse without it)
+#
+# Anything marked as "optional" degrades gracefully: the app keeps running, the
+# feature it powers just throws a user-friendly "not configured" error.
+
+spring:
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate          # Flyway owns the schema — JPA must not touch it.
+  flyway:
+    enabled: true
+    baseline-on-migrate: true     # Needed if you ever attach to an existing DB.
+
+  # JDBC needs the "jdbc:postgresql://..." prefix; Render's DATABASE_URL is
+  # plain "postgres://..." which Spring can't use directly. So we construct
+  # the URL from per-field env vars that render.yaml exposes explicitly:
+  #   DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USERNAME, DATABASE_PASSWORD
+  # Falls back to JDBC_DATABASE_URL if you set that yourself (for other hosts).
+  datasource:
+    url: ${JDBC_DATABASE_URL:jdbc:postgresql://${DATABASE_HOST}:${DATABASE_PORT:5432}/${DATABASE_NAME}}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+
+logging:
+  level:
+    "[com.leadrush]": INFO
+    "[org.hibernate.SQL]": WARN
+    "[org.springframework.security]": WARN
+
+# Actuator — Render polls /actuator/health for healthcheckPath.
+# Keep the exposure narrow to avoid leaking internals.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never

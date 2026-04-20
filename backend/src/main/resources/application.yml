@@ -105,5 +105,7 @@ logging:
     org.springframework.security: WARN
 
 # ── Server ──
+# PORT is injected by Render / Heroku / Fly; locally it falls back to 8080.
+# Spring binds to 0.0.0.0 by default so we don't need server.address.
 server:
-  port: 8080
+  port: ${PORT:8080}

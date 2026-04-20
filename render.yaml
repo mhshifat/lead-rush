@@ -1,0 +1,173 @@
+# ──────────────────────────────────────────────────────────────
+# Lead Rush — Render Blueprint (Infrastructure as Code)
+#
+# Provisions in one shot:
+#   • Postgres database           → "lead-rush-db"
+#   • Key-value store (Redis)     → "lead-rush-redis"
+#   • Backend (Spring Boot, Docker) → "lead-rush-backend"
+#   • Frontend (Nuxt 3 SSR, Node)   → "lead-rush-frontend"
+#
+# Secrets you'll set once in the Render dashboard after the initial deploy
+# (every envVar marked `sync: false` below). See the README at the bottom
+# of this file for the full list.
+#
+# Docs: https://render.com/docs/blueprint-spec
+# ──────────────────────────────────────────────────────────────
+
+# Databases (Postgres) — declared separately from services.
+databases:
+  - name: lead-rush-db
+    databaseName: leadrush
+    user: leadrush
+    plan: free                    # 1 GB storage, expires 90 days if free; upgrade for prod
+    postgresMajorVersion: "16"
+
+services:
+  # ── Redis / Valkey (Render's "Key Value" service) ──
+  - type: keyvalue
+    name: lead-rush-redis
+    plan: free                    # 25 MB — matches the 30 MB budget the app is designed for
+    region: oregon
+    maxmemoryPolicy: allkeys-lru  # safe eviction: Lead Rush uses Redis purely as cache
+    ipAllowList: []               # empty = only Render services can reach it
+
+  # ── Backend: Spring Boot (Dockerfile) ──
+  - type: web
+    name: lead-rush-backend
+    runtime: docker
+    plan: free                    # 512 MB RAM, sleeps after 15 min idle on free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: PORT
+        value: "8080"             # Render will override with its own $PORT; this is a no-op fallback
+
+      # Database — expose fields individually so prod.yml can build the JDBC URL.
+      - key: DATABASE_HOST
+        fromDatabase:
+          name: lead-rush-db
+          property: host
+      - key: DATABASE_PORT
+        fromDatabase:
+          name: lead-rush-db
+          property: port
+      - key: DATABASE_NAME
+        fromDatabase:
+          name: lead-rush-db
+          property: database
+      - key: DATABASE_USERNAME
+        fromDatabase:
+          name: lead-rush-db
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: lead-rush-db
+          property: password
+
+      # Redis — Render exposes a redis:// URL on the connectionString property.
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: lead-rush-redis
+          property: connectionString
+
+      # Secrets auto-generated on first deploy. Rotate via the dashboard any time.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+      # Frontend origin — used to build absolute links in emails + panel deep-links.
+      # Set to the frontend service's URL after first deploy (see README below).
+      - key: FRONTEND_URL
+        sync: false
+
+      # Email (SMTP) — set these in dashboard when you're ready to send mail.
+      # App degrades gracefully if unset: outreach sends fail with a clear error.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM_ADDRESS
+        sync: false
+      - key: EMAIL_FROM_NAME
+        sync: false
+
+      # OAuth (Google + GitHub) — optional; flip on when you uncomment the
+      # oauth2 block in application.yml.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+
+      # Cloudinary (file storage) — optional; storage adapter throws if unset.
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+      # Stripe — optional until you switch on billing.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+
+      # Groq (AI opener + email writer). If unset, the extension's AI button
+      # shows "AI is not configured" instead of crashing.
+      - key: GROQ_API_KEY
+        sync: false
+
+      # Enrichment providers — all optional. Waterfall skips any that are blank.
+      - key: HUNTER_API_KEY
+        sync: false
+      - key: DROPCONTACT_API_KEY
+        sync: false
+      - key: CLEARBIT_API_KEY
+        sync: false
+      - key: PEOPLE_DATA_LABS_API_KEY
+        sync: false
+
+  # ── Frontend: Nuxt 3 SSR (Node runtime) ──
+  - type: web
+    name: lead-rush-frontend
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: node .output/server/index.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NITRO_PORT
+        value: "10000"            # Render injects PORT; Nitro reads NITRO_PORT too
+      - key: NUXT_PUBLIC_SITE_URL
+        sync: false               # set after deploy — your final https://... frontend URL
+      - key: NUXT_PUBLIC_API_BASE_URL
+        sync: false               # set to the backend service URL (e.g. https://lead-rush-backend.onrender.com/api/v1)
+
+# ───────────────────────────────────────────
+# Post-deploy checklist (do this after the first successful sync):
+#
+# 1. Backend: open the service → Logs → confirm Flyway applied V1..V26.
+# 2. Frontend: set NUXT_PUBLIC_API_BASE_URL to your backend URL + "/api/v1".
+# 3. Backend: set FRONTEND_URL to your frontend URL (https://lead-rush-frontend...).
+# 4. Browser extension: rebuild with WXT_BACKEND_URL pointing at the backend,
+#    then load .output/chrome-mv3 as unpacked.
+# 5. Optional creds: SMTP_*, GROQ_API_KEY, CLOUDINARY_*, enrichment API keys.
+#    Each feature fails cleanly with a user-friendly error if its creds are missing.
+# ───────────────────────────────────────────
