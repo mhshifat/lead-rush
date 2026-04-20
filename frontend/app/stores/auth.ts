@@ -142,6 +142,20 @@ export const useAuthStore = defineStore('auth', () => {
    * Tokens arrive in the URL query string (see OAuth2LoginSuccessHandler);
    * we persist them to cookies, fetch the user/workspaces via /auth/me, and
    * remember the provider for the "Last used" badge on subsequent visits.
+   *
+   * Two defensive choices here vs a naive implementation:
+   *
+   * 1. We pass `Authorization: Bearer <token>` explicitly instead of relying
+   *    on the ofetch interceptor to read the freshly-set cookie. Nuxt's
+   *    useCookie is reactive, but there's a subtle window between
+   *    `accessToken.value = ...` and the next `useCookie('accessToken').value`
+   *    read where the latter can still return the previous value. Passing the
+   *    header directly removes the race entirely.
+   *
+   * 2. We set `_skipGlobalError: true` so the api plugin's `onResponseError`
+   *    doesn't auto-logout on a 401 here. Without this, a failed /auth/me
+   *    during OAuth hydration would clear the cookies we just set AND redirect
+   *    the user away before our own catch block could show a meaningful error.
    */
   async function consumeOAuthCallback(params: {
     accessToken: string
@@ -153,7 +167,13 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = params.refreshToken
 
     const { $api } = useNuxtApp()
-    const response = await $api<ApiSuccessDto<AuthResponseDto>>('/auth/me')
+    const response = await $api<ApiSuccessDto<AuthResponseDto>>('/auth/me', {
+      headers: { Authorization: `Bearer ${params.accessToken}` },
+      // Opt out of the global 401-auto-logout handler — we just minted this
+      // token, any failure here is transient (cold backend, network blip) and
+      // should surface to the callback page, not nuke the session.
+      _skipGlobalError: true,
+    } as any)
     // /auth/me returns user + workspaces but no tokens; we already have those.
     user.value = UserMapper.toEntity(response.data.user)
     workspaces.value = WorkspaceMapper.toEntityList(response.data.workspaces)
