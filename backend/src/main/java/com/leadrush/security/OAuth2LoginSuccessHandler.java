@@ -42,33 +42,36 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     public void onAuthenticationSuccess(HttpServletRequest request,
                                          HttpServletResponse response,
                                          Authentication authentication) throws IOException {
-        if (!(authentication instanceof OAuth2AuthenticationToken oauthToken)) {
-            log.warn("OAuth2 success handler received non-OAuth2 authentication: {}",
-                    authentication.getClass().getSimpleName());
-            redirectWithError(response, "oauth_unexpected");
-            return;
-        }
-
-        String registrationId = oauthToken.getAuthorizedClientRegistrationId();  // "google" | "github"
-        AuthProvider provider = switch (registrationId.toLowerCase()) {
-            case "google" -> AuthProvider.GOOGLE;
-            case "github" -> AuthProvider.GITHUB;
-            default -> null;
-        };
-        if (provider == null) {
-            log.warn("Unknown OAuth2 registration id: {}", registrationId);
-            redirectWithError(response, "oauth_unknown_provider");
-            return;
-        }
-
-        OAuth2User oauthUser = oauthToken.getPrincipal();
-        AuthService.OAuthProfile profile = extractProfile(provider, oauthUser);
-
+        // One big try/catch so ANY failure after the OAuth handshake — attribute
+        // extraction, DB write, redirect — routes through a user-friendly
+        // /auth/login?error=... redirect instead of leaking Spring's Whitelabel
+        // 500. Narrow catches let exceptions bubble to the servlet error page.
         try {
+            if (!(authentication instanceof OAuth2AuthenticationToken oauthToken)) {
+                log.warn("OAuth2 success handler received non-OAuth2 authentication: {}",
+                        authentication.getClass().getSimpleName());
+                redirectWithError(response, "oauth_unexpected");
+                return;
+            }
+
+            String registrationId = oauthToken.getAuthorizedClientRegistrationId();  // "google" | "github"
+            AuthProvider provider = switch (registrationId.toLowerCase()) {
+                case "google" -> AuthProvider.GOOGLE;
+                case "github" -> AuthProvider.GITHUB;
+                default -> null;
+            };
+            if (provider == null) {
+                log.warn("Unknown OAuth2 registration id: {}", registrationId);
+                redirectWithError(response, "oauth_unknown_provider");
+                return;
+            }
+
+            OAuth2User oauthUser = oauthToken.getPrincipal();
+            AuthService.OAuthProfile profile = extractProfile(provider, oauthUser);
             AuthResponse auth = authService.loginViaOAuth(provider, profile);
             redirectWithTokens(response, provider, auth);
         } catch (Exception e) {
-            log.error("OAuth login failed for provider={} email={}", provider, profile.email(), e);
+            log.error("OAuth login failed", e);
             redirectWithError(response, "oauth_login_failed");
         }
     }
@@ -76,9 +79,12 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     /**
      * Normalise Google vs GitHub attribute shapes into our neutral OAuthProfile.
      *
-     *   Google attrs:  sub, email, email_verified, name, picture
+     *   Google attrs:  sub, email, email_verified (Boolean), name, picture
      *   GitHub attrs:  id (int), login, name, email, avatar_url
-     *                  (email auto-populated by Spring when "user:email" scope is granted)
+     *                  — email comes from /user OR LeadRushOAuth2UserService's
+     *                    fallback to /user/emails, which only accepts verified
+     *                    addresses. So any email we see from GitHub is verified
+     *                    by construction.
      */
     private AuthService.OAuthProfile extractProfile(AuthProvider provider, OAuth2User user) {
         Map<String, Object> attrs = user.getAttributes();
@@ -87,14 +93,18 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                     str(attrs.get("sub")),
                     str(attrs.get("email")),
                     str(attrs.get("name")),
-                    str(attrs.get("picture"))
+                    str(attrs.get("picture")),
+                    Boolean.TRUE.equals(attrs.get("email_verified"))
             );
             case GITHUB -> new AuthService.OAuthProfile(
                     str(attrs.get("id")),                              // int → string
                     str(attrs.get("email")),
                     // GitHub's "name" is optional; fall back to login (username).
                     attrs.get("name") != null ? str(attrs.get("name")) : str(attrs.get("login")),
-                    str(attrs.get("avatar_url"))
+                    str(attrs.get("avatar_url")),
+                    // Our custom user service only merges /user/emails entries
+                    // where verified=true, so any email we see here is verified.
+                    true
             );
             default -> throw new IllegalArgumentException("Unsupported provider: " + provider);
         };

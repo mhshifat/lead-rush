@@ -2,6 +2,7 @@ package com.leadrush.config;
 
 import com.leadrush.apikey.service.ApiKeyAuthenticationFilter;
 import com.leadrush.security.JwtAuthenticationFilter;
+import com.leadrush.security.LeadRushOAuth2UserService;
 import com.leadrush.security.OAuth2LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +22,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+    private final LeadRushOAuth2UserService leadRushOAuth2UserService;
     private final LeadRushProperties properties;
 
     @Bean
@@ -67,6 +69,10 @@ public class SecurityConfig {
             .oauth2Login(oauth2 -> oauth2
                 .authorizationEndpoint(ae -> ae.baseUri("/api/v1/auth/oauth2/authorize"))
                 .redirectionEndpoint(re -> re.baseUri("/api/v1/auth/oauth2/callback/*"))
+                // Custom user service fetches a primary email from GitHub's
+                // /user/emails endpoint when the main /user response hides it
+                // (the common case — most devs keep their email private).
+                .userInfoEndpoint(u -> u.userService(leadRushOAuth2UserService))
                 .successHandler(oAuth2LoginSuccessHandler)
                 .failureHandler((request, response, exception) -> {
                     // Common failure: user clicked "deny" on the provider consent page.

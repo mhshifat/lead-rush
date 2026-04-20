@@ -92,6 +92,16 @@ public class AuthService {
                 + "Grant email access on the consent screen and try again."
             );
         }
+        // Refuse unverified emails. See OAuthProfile.emailVerified javadoc —
+        // skipping this check opens an account-takeover hole where an attacker
+        // who added (but didn't verify) the victim's email on their own
+        // Google/GitHub account could sign in as the victim here.
+        if (!profile.emailVerified()) {
+            throw new BusinessException(
+                "Your " + provider.name().toLowerCase() + " email isn't verified. "
+                + "Confirm it with the provider and try again."
+            );
+        }
 
         User user = switch (provider) {
             case GOOGLE -> findOrCreateViaOAuth(provider, profile,
@@ -155,12 +165,22 @@ public class AuthService {
      * Neutral shape decoupled from Spring's OAuth2User — lets the handler feed
      * Google and GitHub attributes into one method without the service having
      * to know about Spring Security types.
+     *
+     * @param emailVerified  whether the IdP confirmed the user actually owns
+     *                       this email. {@code false} means "they claim it"
+     *                       but nobody clicked a verification link, so we
+     *                       MUST NOT link the OAuth identity to an existing
+     *                       account at that address — that would let an
+     *                       attacker who added the victim's email to their
+     *                       own Google/GitHub account take the victim's
+     *                       Lead Rush account over.
      */
     public record OAuthProfile(
             String providerId,
             String email,
             String name,
-            String avatarUrl
+            String avatarUrl,
+            boolean emailVerified
     ) {}
 
     @Transactional
