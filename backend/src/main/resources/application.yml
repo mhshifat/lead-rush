@@ -57,21 +57,25 @@ spring:
       mail.smtp.starttls.enable: true
 
   # ── OAuth2 (Google + GitHub) ──
-  # Uncomment when OAuth client credentials are provisioned.
-  #security:
-  #  oauth2:
-  #    client:
-  #      registration:
-  #        google:
-  #          client-id: ${GOOGLE_CLIENT_ID}
-  #          client-secret: ${GOOGLE_CLIENT_SECRET}
-  #          scope: email, profile
-  #          redirect-uri: "{baseUrl}/api/v1/auth/oauth2/callback/google"
-  #        github:
-  #          client-id: ${GITHUB_CLIENT_ID}
-  #          client-secret: ${GITHUB_CLIENT_SECRET}
-  #          scope: user:email, read:user
-  #          redirect-uri: "{baseUrl}/api/v1/auth/oauth2/callback/github"
+  # Credentials are injected as env vars. Empty defaults keep local dev bootable
+  # without OAuth apps configured; Spring Security only enables a provider whose
+  # client-id is non-empty, so leaving these blank simply hides the buttons.
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: email, profile
+            # Custom callback path so the auth endpoints sit next to the rest
+            # of /api/v1/auth/* instead of Spring's default /login/oauth2/code/*.
+            redirect-uri: "{baseUrl}/api/v1/auth/oauth2/callback/google"
+          github:
+            client-id: ${GITHUB_CLIENT_ID:}
+            client-secret: ${GITHUB_CLIENT_SECRET:}
+            scope: user:email, read:user
+            redirect-uri: "{baseUrl}/api/v1/auth/oauth2/callback/github"
 
 # ── Custom App Config ──
 leadrush:

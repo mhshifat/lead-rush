@@ -54,9 +54,19 @@ public class AuthService {
                 .build();
         user = userRepository.save(user);
 
-        String slug = generateSlug(request.getName());
+        createDefaultWorkspace(user);
+
+        String token = generateActivationToken(user.getId());
+        transactionalEmailService.sendActivationEmail(user.getEmail(), user.getName(), token);
+
+        log.info("User registered: {} (id: {})", user.getEmail(), user.getId());
+    }
+
+    /** Shared between email/password register + OAuth first-login flows. */
+    private void createDefaultWorkspace(User user) {
+        String slug = generateSlug(user.getName());
         Workspace workspace = Workspace.builder()
-                .name(request.getName() + "'s Workspace")
+                .name(user.getName() + "'s Workspace")
                 .slug(slug)
                 .build();
         workspace = workspaceRepository.save(workspace);
@@ -67,12 +77,91 @@ public class AuthService {
                 .role(WorkspaceRole.OWNER)
                 .build();
         membershipRepository.save(membership);
-
-        String token = generateActivationToken(user.getId());
-        transactionalEmailService.sendActivationEmail(user.getEmail(), user.getName(), token);
-
-        log.info("User registered: {} (id: {})", user.getEmail(), user.getId());
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // OAuth login — called by OAuth2LoginSuccessHandler once Spring Security
+    // has finished the provider handshake. Does the create-or-link dance and
+    // returns a fully-signed AuthResponse the handler can hand to the client.
+    // ─────────────────────────────────────────────────────────────────────
+    @Transactional
+    public AuthResponse loginViaOAuth(AuthProvider provider, OAuthProfile profile) {
+        if (profile.email() == null || profile.email().isBlank()) {
+            throw new BusinessException(
+                "Your " + provider.name().toLowerCase() + " account doesn't have a public email. "
+                + "Grant email access on the consent screen and try again."
+            );
+        }
+
+        User user = switch (provider) {
+            case GOOGLE -> findOrCreateViaOAuth(provider, profile,
+                    userRepository.findByGoogleId(profile.providerId()));
+            case GITHUB -> findOrCreateViaOAuth(provider, profile,
+                    userRepository.findByGithubId(profile.providerId()));
+            default -> throw new BusinessException("Unsupported OAuth provider: " + provider);
+        };
+
+        user.setLastUsedProvider(provider);
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        return buildAuthResponse(user);
+    }
+
+    private User findOrCreateViaOAuth(AuthProvider provider, OAuthProfile profile,
+                                      java.util.Optional<User> byProviderId) {
+        // 1. Already linked? just return — happy path for returning users.
+        if (byProviderId.isPresent()) return byProviderId.get();
+
+        // 2. Account exists at this email? Link the provider to it. Google/GitHub
+        //    have already verified the email, so we mark it verified too (useful
+        //    when a LOCAL user signs in via Google before ever clicking their
+        //    activation link — they get in immediately).
+        java.util.Optional<User> byEmail = userRepository.findByEmail(profile.email());
+        if (byEmail.isPresent()) {
+            User existing = byEmail.get();
+            linkProvider(existing, provider, profile.providerId());
+            existing.setEmailVerified(true);
+            if (existing.getAvatarUrl() == null && profile.avatarUrl() != null) {
+                existing.setAvatarUrl(profile.avatarUrl());
+            }
+            return userRepository.save(existing);
+        }
+
+        // 3. Brand new user — create the account + their default workspace.
+        User fresh = User.builder()
+                .email(profile.email())
+                .name(profile.name() != null ? profile.name() : profile.email())
+                .avatarUrl(profile.avatarUrl())
+                .primaryProvider(provider)
+                .emailVerified(true)            // trusted — the IdP vouched for it
+                .systemRole(SystemRole.USER)
+                .build();
+        linkProvider(fresh, provider, profile.providerId());
+        fresh = userRepository.save(fresh);
+        createDefaultWorkspace(fresh);
+        return fresh;
+    }
+
+    private void linkProvider(User user, AuthProvider provider, String providerId) {
+        switch (provider) {
+            case GOOGLE -> user.setGoogleId(providerId);
+            case GITHUB -> user.setGithubId(providerId);
+            default -> { /* unreachable — validated upstream */ }
+        }
+    }
+
+    /**
+     * Neutral shape decoupled from Spring's OAuth2User — lets the handler feed
+     * Google and GitHub attributes into one method without the service having
+     * to know about Spring Security types.
+     */
+    public record OAuthProfile(
+            String providerId,
+            String email,
+            String name,
+            String avatarUrl
+    ) {}
 
     @Transactional
     public AuthResponse login(LoginRequest request) {

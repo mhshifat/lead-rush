@@ -32,8 +32,12 @@ export default defineNuxtConfig({
       link: [
         // SVG favicon — modern browsers prefer this over .ico, scales to any DPR.
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        // Multi-size ICO for legacy browsers + the tab-bar icon some browsers
+        // insist on fetching from /favicon.ico regardless of <link> priority.
+        // Both files are generated from favicon.svg by scripts/generate-favicons.mjs.
         { rel: 'alternate icon', type: 'image/x-icon', href: '/favicon.ico' },
-        { rel: 'apple-touch-icon', href: '/favicon.svg' },
+        // iOS/iPadOS home-screen icon — must be a raster PNG; SVG isn't rendered.
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
       ],
     },
   },

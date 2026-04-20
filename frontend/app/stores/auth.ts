@@ -137,6 +137,30 @@ export const useAuthStore = defineStore('auth', () => {
     workspaces.value = WorkspaceMapper.toEntityList(data.workspaces)
   }
 
+  /**
+   * Entry point for the /auth/callback page after an OAuth round-trip.
+   * Tokens arrive in the URL query string (see OAuth2LoginSuccessHandler);
+   * we persist them to cookies, fetch the user/workspaces via /auth/me, and
+   * remember the provider for the "Last used" badge on subsequent visits.
+   */
+  async function consumeOAuthCallback(params: {
+    accessToken: string
+    refreshToken: string
+    provider: string
+    email: string
+  }) {
+    accessToken.value = params.accessToken
+    refreshToken.value = params.refreshToken
+
+    const { $api } = useNuxtApp()
+    const response = await $api<ApiSuccessDto<AuthResponseDto>>('/auth/me')
+    // /auth/me returns user + workspaces but no tokens; we already have those.
+    user.value = UserMapper.toEntity(response.data.user)
+    workspaces.value = WorkspaceMapper.toEntityList(response.data.workspaces)
+
+    saveLastUsedAuth(params.email, params.provider)
+  }
+
   function saveLastUsedAuth(email: string, provider: string) {
     if (import.meta.client) {
       localStorage.setItem('lastUsedAuth', JSON.stringify({
@@ -170,6 +194,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     switchWorkspace,
     hydrate,
+    consumeOAuthCallback,
     getLastUsedAuth,
   }
 })
