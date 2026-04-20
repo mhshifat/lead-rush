@@ -62,3 +62,17 @@ management:
       probes:
         enabled: true
       show-details: never
+  # Turn off the Redis (and a couple of other cross-network) health indicators.
+  # Why: Render polls /actuator/health every few seconds. If Upstash is slow to
+  # respond (cold TLS handshake, queueing, regional hop), the aggregate health
+  # check takes > 10 s, Render marks the service unhealthy, kills the pod, and
+  # we rolling-restart mid-request. Redis is a cache — losing it doesn't break
+  # the app (see CacheService's try/catch fallthrough). So don't gate LIVENESS
+  # on Upstash's latency.
+  health:
+    redis:
+      enabled: false
+    mail:
+      enabled: false
+    ping:
+      enabled: true

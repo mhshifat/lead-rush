@@ -1,6 +1,7 @@
 package com.leadrush.config;
 
 import com.leadrush.apikey.service.ApiKeyAuthenticationFilter;
+import com.leadrush.security.JsonAuthenticationEntryPoint;
 import com.leadrush.security.JwtAuthenticationFilter;
 import com.leadrush.security.LeadRushOAuth2UserService;
 import com.leadrush.security.OAuth2LoginSuccessHandler;
@@ -23,6 +24,7 @@ public class SecurityConfig {
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
     private final LeadRushOAuth2UserService leadRushOAuth2UserService;
+    private final JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint;
     private final LeadRushProperties properties;
 
     @Bean
@@ -35,6 +37,12 @@ public class SecurityConfig {
             // create a session ONLY during the OAuth handshake; JWT-authenticated
             // requests still flow through without touching one.
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+
+            // Return 401 JSON on unauthenticated requests instead of Spring's
+            // default 302-to-login-page. Matters because .oauth2Login() above
+            // registers a DefaultLoginPageGeneratingFilter that would otherwise
+            // serve HTML at /login — clients expecting JSON break on the redirect.
+            .exceptionHandling(eh -> eh.authenticationEntryPoint(jsonAuthenticationEntryPoint))
 
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
