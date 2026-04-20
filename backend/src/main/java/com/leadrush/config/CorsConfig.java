@@ -25,7 +25,8 @@ public class CorsConfig {
         // FRONTEND_URL may be a single origin or a comma-separated list. The list
         // form is how Vercel preview deployments (per-branch URLs) get allowed
         // alongside the production domain — e.g. "https://app.leadrush.com,https://*.vercel.app".
-        // Entries with "*" are treated as patterns; plain URLs go through as exact origins.
+        // Entries with "*" are treate
+        // d as patterns; plain URLs go through as exact origins.
         List<String> configured = Arrays.stream(properties.getFrontendUrl().split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
