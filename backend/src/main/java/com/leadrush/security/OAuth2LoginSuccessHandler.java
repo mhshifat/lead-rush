@@ -50,7 +50,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             if (!(authentication instanceof OAuth2AuthenticationToken oauthToken)) {
                 log.warn("OAuth2 success handler received non-OAuth2 authentication: {}",
                         authentication.getClass().getSimpleName());
-                redirectWithError(response, "oauth_unexpected");
+                redirectWithError(request, response, "oauth_unexpected");
                 return;
             }
 
@@ -62,17 +62,17 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             };
             if (provider == null) {
                 log.warn("Unknown OAuth2 registration id: {}", registrationId);
-                redirectWithError(response, "oauth_unknown_provider");
+                redirectWithError(request, response, "oauth_unknown_provider");
                 return;
             }
 
             OAuth2User oauthUser = oauthToken.getPrincipal();
             AuthService.OAuthProfile profile = extractProfile(provider, oauthUser);
             AuthResponse auth = authService.loginViaOAuth(provider, profile);
-            redirectWithTokens(response, provider, auth);
+            redirectWithTokens(request, response, provider, auth);
         } catch (Exception e) {
             log.error("OAuth login failed", e);
-            redirectWithError(response, "oauth_login_failed");
+            redirectWithError(request, response, "oauth_login_failed");
         }
     }
 
@@ -114,7 +114,8 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         return value == null ? null : String.valueOf(value);
     }
 
-    private void redirectWithTokens(HttpServletResponse response,
+    private void redirectWithTokens(HttpServletRequest request,
+                                     HttpServletResponse response,
                                      AuthProvider provider,
                                      AuthResponse auth) throws IOException {
         String target = frontendBase()
@@ -123,12 +124,16 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 + "&refreshToken=" + enc(auth.getRefreshToken())
                 + "&provider=" + provider.name()
                 + "&email=" + enc(auth.getUser().getEmail());
-        getRedirectStrategy().sendRedirect(null, response, target);
+        // Spring's DefaultRedirectStrategy.sendRedirect() calls request.getContextPath()
+        // internally — passing null for request throws NPE. Pass the real request.
+        getRedirectStrategy().sendRedirect(request, response, target);
     }
 
-    private void redirectWithError(HttpServletResponse response, String code) throws IOException {
+    private void redirectWithError(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    String code) throws IOException {
         String target = frontendBase() + "/auth/login?error=" + enc(code);
-        getRedirectStrategy().sendRedirect(null, response, target);
+        getRedirectStrategy().sendRedirect(request, response, target);
     }
 
     private String frontendBase() {
