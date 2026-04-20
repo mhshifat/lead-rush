@@ -22,7 +22,6 @@
     "clsx": "^2.1.1",
     "lucide-vue-next": "^1.0.0",
     "nuxt": "^4.4.2",
-    "@nuxt/vite-builder": "4.3.1",
     "ofetch": "^1.5.1",
     "radix-vue": "^1.9.17",
     "reka-ui": "^2.9.6",
@@ -37,8 +36,5 @@
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@types/sockjs-client": "^1.5.4"
-  },
-  "overrides": {
-    "@nuxt/vite-builder": "4.3.1"
   }
 }
