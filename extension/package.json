@@ -11,6 +11,10 @@
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "compile": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "icons": "node scripts/generate-icons.mjs",
+    "prebuild": "node scripts/generate-icons.mjs",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
@@ -18,11 +22,15 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/chrome": "^0.0.270",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@wxt-dev/module-react": "^1.1.2",
+    "@vitest/ui": "^4.1.4",
+    "@wxt-dev/module-react": "^1.2.2",
+    "happy-dom": "^20.9.0",
     "typescript": "^5.6.3",
-    "wxt": "^0.19.13"
+    "vitest": "^4.1.4",
+    "wxt": "^0.20.25"
   }
 }

@@ -1,30 +1,39 @@
 /**
  * Popup — three states:
- *   1. Not connected → paste API key + choose API base URL
+ *   1. Not connected → paste API key
  *   2. Connected → show "me" header + pending LinkedIn tasks
  *   3. Error connecting → show error + let user re-paste
+ *
+ * The backend URL is baked in at build time (WXT env var). We don't ask the
+ * user because in practice it only has two values: localhost for dev builds,
+ * one production URL for the shipped extension.
  */
 import { useEffect, useState } from 'react'
-import { send } from '@/lib/messaging'
+import { isAuthError, send } from '@/lib/messaging'
 import type { ExtensionConfig, ExtensionTaskDto, MeDto } from '@/lib/types'
 import { AnimatedOrbs } from '@/components/AnimatedOrbs'
+import { BrandMark } from '@/components/BrandMark'
 
-const DEFAULT_API_BASE = 'http://localhost:8080'
+// Build-time-baked backend URL. Override for prod with:
+//   WXT_BACKEND_URL=https://api.leadrush.com wxt build
+// Vite substitutes the literal at build time — no runtime fetch to configure it.
+const BACKEND_URL = (import.meta.env.WXT_BACKEND_URL as string | undefined) ?? 'http://localhost:8080'
 
 export function App() {
   const [loading, setLoading] = useState(true)
   const [me, setMe] = useState<MeDto | null>(null)
   const [tasks, setTasks] = useState<ExtensionTaskDto[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [authExpired, setAuthExpired] = useState(false)
 
   // Connect form state
   const [apiKey, setApiKey] = useState('')
-  const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_API_BASE)
   const [connecting, setConnecting] = useState(false)
 
   async function refresh() {
     setLoading(true)
     setError(null)
+    setAuthExpired(false)
     try {
       const config = await send<ExtensionConfig | null>({ type: 'getConfig' })
       if (!config) {
@@ -32,7 +41,6 @@ export function App() {
         setTasks([])
         return
       }
-      setApiBaseUrl(config.apiBaseUrl)
       const [meResult, tasksResult] = await Promise.all([
         send<MeDto>({ type: 'me' }),
         send<ExtensionTaskDto[]>({ type: 'listTasks' }),
@@ -40,7 +48,14 @@ export function App() {
       setMe(meResult)
       setTasks(tasksResult)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      if (isAuthError(err)) {
+        // Key was revoked on the server — show the paste-a-new-one UI with a warning,
+        // but keep the old base URL for convenience.
+        setAuthExpired(true)
+        setError('Your API key was revoked or expired. Paste a new one below.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      }
       setMe(null)
     } finally {
       setLoading(false)
@@ -57,7 +72,7 @@ export function App() {
       await send({
         type: 'setConfig',
         apiKey: apiKey.trim(),
-        apiBaseUrl: apiBaseUrl.trim().replace(/\/$/, ''),
+        apiBaseUrl: BACKEND_URL,
       })
       setApiKey('')
       await refresh()
@@ -90,12 +105,7 @@ export function App() {
         {/* Brand row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div
-              style={{
-                width: 22, height: 22, borderRadius: 6,
-                background: 'linear-gradient(135deg, hsl(243 80% 65%), hsl(280 75% 60%))',
-              }}
-            />
+            <BrandMark size={22} />
             <div style={{ fontWeight: 600, letterSpacing: '-0.01em' }}>Lead Rush</div>
           </div>
           {me && (
@@ -115,18 +125,20 @@ export function App() {
         {!loading && !me && (
           <div className="lr-fade-up">
             <h1 className="lr-gradient-text" style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 4 }}>
-              Connect to Lead Rush
+              {authExpired ? 'Reconnect to Lead Rush' : 'Connect to Lead Rush'}
             </h1>
             <p className="lr-muted" style={{ fontSize: 12, marginBottom: 16 }}>
-              Generate an API key in Settings → API keys, then paste it here.
+              {authExpired
+                ? 'Generate a fresh key in Settings → API keys and paste it below.'
+                : 'Generate an API key in Settings → API keys, then paste it here.'}
             </p>
 
             {error && (
               <div style={{
                 padding: 10, marginBottom: 12, borderRadius: 'var(--lr-radius)',
-                background: 'hsl(0 72% 58% / 0.1)',
-                border: '1px solid hsl(0 72% 58% / 0.3)',
-                color: 'hsl(0 90% 85%)', fontSize: 12,
+                background: authExpired ? 'hsl(30 90% 58% / 0.12)' : 'hsl(0 72% 58% / 0.1)',
+                border: `1px solid ${authExpired ? 'hsl(30 90% 58% / 0.35)' : 'hsl(0 72% 58% / 0.3)'}`,
+                color: authExpired ? 'hsl(30 100% 82%)' : 'hsl(0 90% 85%)', fontSize: 12,
               }}>{error}</div>
             )}
 
@@ -139,14 +151,17 @@ export function App() {
               onChange={e => setApiKey(e.target.value)}
               style={{ marginBottom: 12 }}
             />
-            <label className="lr-label">API URL</label>
-            <input
-              className="lr-input"
-              placeholder="http://localhost:8080"
-              value={apiBaseUrl}
-              onChange={e => setApiBaseUrl(e.target.value)}
-              style={{ marginBottom: 16 }}
-            />
+            <p
+              className="lr-muted"
+              style={{ fontSize: 11, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}
+              title={BACKEND_URL /* URL still visible in the tooltip for support debugging */}
+            >
+              <span style={{
+                display: 'inline-block', width: 6, height: 6, borderRadius: 999,
+                background: 'hsl(150 60% 50%)',
+              }} />
+              Ready to connect
+            </p>
             <button
               className="lr-button lr-button--primary"
               style={{ width: '100%' }}
@@ -188,9 +203,20 @@ export function App() {
             {tasks.length === 0 ? (
               <div className="lr-hairline lr-muted" style={{
                 borderRadius: 'var(--lr-radius)',
-                padding: 20, fontSize: 12, textAlign: 'center',
+                padding: 16, fontSize: 12, textAlign: 'center',
+                display: 'flex', flexDirection: 'column', gap: 6,
               }}>
-                Nothing pending right now. Visit a LinkedIn profile with an active LinkedIn step to surface it here.
+                <div style={{ fontWeight: 600, color: 'var(--lr-fg)' }}>You're all caught up</div>
+                <div>
+                  Tasks here come from sequences with{' '}
+                  <strong style={{ color: 'var(--lr-fg)' }}>LinkedIn Connect</strong>{' '}
+                  or{' '}
+                  <strong style={{ color: 'var(--lr-fg)' }}>LinkedIn Message</strong>{' '}
+                  steps — assigned to you when an enrolled contact reaches that step.
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  To import the profile you're currently viewing, use the Lead Rush side panel on the LinkedIn page.
+                </div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>

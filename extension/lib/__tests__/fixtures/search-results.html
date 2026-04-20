@@ -1,0 +1,35 @@
+<!--
+  Minimal stand-in for linkedin.com/search/results/people/
+  Each <li.reusable-search__result-container> is one row.
+  Matches the scraper's selectors — update both when LinkedIn ships DOM changes.
+-->
+<div class="search-results-container">
+  <ul>
+    <li class="reusable-search__result-container">
+      <a href="https://www.linkedin.com/in/janedoe/?miniProfileUrn=abc">
+        <span aria-hidden="true">Jane Doe</span>
+        <span class="visually-hidden">View Jane Doe's profile</span>
+      </a>
+      <div class="entity-result__primary-subtitle">Senior Engineer at Acme Inc</div>
+      <div class="entity-result__secondary-subtitle">San Francisco Bay Area</div>
+      <img class="ivm-view-attr__img--centered" src="https://media.licdn.com/jane.jpg" alt="Jane Doe" />
+    </li>
+
+    <li class="reusable-search__result-container">
+      <a href="https://www.linkedin.com/in/johnsmith/">
+        <span aria-hidden="true">John Smith</span>
+        <span class="visually-hidden">View John Smith's profile</span>
+      </a>
+      <div class="entity-result__primary-subtitle">VP of Sales at Globex</div>
+      <div class="entity-result__secondary-subtitle">New York, NY</div>
+      <img class="ivm-view-attr__img--centered" src="https://media.licdn.com/john.jpg" alt="John Smith" />
+    </li>
+
+    <!-- Duplicate anchor — same canonical URL should dedupe to a single result. -->
+    <li class="reusable-search__result-container">
+      <a href="https://www.linkedin.com/in/janedoe/details/experience">
+        <span aria-hidden="true">Jane Doe</span>
+      </a>
+    </li>
+  </ul>
+</div>

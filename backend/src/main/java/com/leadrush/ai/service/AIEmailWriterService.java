@@ -35,6 +35,83 @@ public class AIEmailWriterService {
     private final ContactRepository contactRepository;
     private final ObjectMapper objectMapper;
 
+    // ── Opener generation (extension side panel) ──
+
+    /**
+     * Generate a short cold-outreach opener from scraped profile data.
+     * Called by the browser extension when the user clicks "✨ Generate opener".
+     *
+     * @param firstName, lastName, title, company, location, about — scraper payload
+     * @param channel  "LINKEDIN_NOTE" (≤300 chars) or "EMAIL" (3–4 lines)
+     * @param valueProp the user's value proposition one-liner (optional)
+     * @return the opener text, trimmed to the channel's length limit
+     */
+    public String generateOpener(
+            String firstName, String lastName, String title, String company,
+            String location, String about, String channel, String valueProp
+    ) {
+        if (!llmAdapter.isReady()) {
+            throw new BusinessException("AI is not configured — set GROQ_API_KEY on the backend");
+        }
+
+        boolean isLinkedInNote = "LINKEDIN_NOTE".equalsIgnoreCase(channel);
+        int maxLength = isLinkedInNote ? 300 : 800;
+
+        String system = isLinkedInNote
+                ? """
+                  You write personalised LinkedIn connection-request notes.
+                  HARD RULES:
+                  - Max 280 characters (LinkedIn's limit is 300 — leave a buffer).
+                  - Warm, specific, non-salesy. ONE compelling reason to connect.
+                  - No links, no emojis, no hashtags, no "I'd love to connect".
+                  - Name them. Reference something specific from their profile.
+                  Return ONLY the note text — no preamble, no quotes, no formatting.
+                  """
+                : """
+                  You write concise cold emails. 3-4 short lines. Personalised.
+                  HARD RULES:
+                  - Opening line names something specific from their profile.
+                  - Middle sentence surfaces the sender's value prop concisely.
+                  - Closing line is one low-friction ask.
+                  - No subject line, no signature. Plain prose, no markdown.
+                  Return ONLY the email body — no preamble, no quotes.
+                  """;
+
+        String fullName = String.join(" ",
+                firstName == null ? "" : firstName,
+                lastName == null ? "" : lastName).trim();
+        StringBuilder user = new StringBuilder();
+        user.append("Write a ").append(isLinkedInNote ? "LinkedIn note" : "cold email")
+            .append(" to:\n")
+            .append("Name: ").append(fullName).append("\n");
+        if (title != null) user.append("Title: ").append(title).append("\n");
+        if (company != null) user.append("Company: ").append(company).append("\n");
+        if (location != null) user.append("Location: ").append(location).append("\n");
+        if (about != null && !about.isBlank()) {
+            String truncated = about.length() > 400 ? about.substring(0, 400) + "…" : about;
+            user.append("About: ").append(truncated).append("\n");
+        }
+        if (valueProp != null && !valueProp.isBlank()) {
+            user.append("\nMy value prop: ").append(valueProp.trim()).append("\n");
+        }
+
+        String result = llmAdapter.complete(LLMAdapter.CompletionRequest.of(system, user.toString()));
+        if (result == null || result.isBlank()) {
+            throw new BusinessException("AI returned empty response — try again");
+        }
+
+        // Tidy up: strip wrapping quotes or leading/trailing whitespace the model often adds.
+        String cleaned = result.trim();
+        if (cleaned.startsWith("\"") && cleaned.endsWith("\"") && cleaned.length() > 1) {
+            cleaned = cleaned.substring(1, cleaned.length() - 1).trim();
+        }
+        // Hard truncate at the channel limit — cheaper than asking the model to self-limit.
+        if (cleaned.length() > maxLength) {
+            cleaned = cleaned.substring(0, maxLength - 1).trim() + "…";
+        }
+        return cleaned;
+    }
+
     // ── Email generation ──
 
     public GenerateEmailResponse generateEmail(GenerateEmailRequest request) {

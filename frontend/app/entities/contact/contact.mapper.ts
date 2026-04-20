@@ -38,6 +38,7 @@ export const ContactMapper = {
         emailType: e.emailType as ContactEmailEntity['emailType'],
         isPrimary: e.primary,
         verificationStatus: e.verificationStatus as ContactEmailEntity['verificationStatus'],
+        source: e.source ?? null,
       })),
 
       phones: dto.phones.map(p => ({

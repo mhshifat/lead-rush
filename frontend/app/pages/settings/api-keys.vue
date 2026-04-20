@@ -8,7 +8,7 @@ import {
 } from '~/components/ui/dialog'
 import { toast } from 'vue-sonner'
 import {
-  Plus, Key, Trash2, Copy, AlertTriangle, Calendar, Clock, ShieldOff,
+  Plus, Key, Trash2, Copy, Check, AlertTriangle, Calendar, Clock, ShieldOff,
 } from 'lucide-vue-next'
 import type { ApiKeyApiDto } from '~/types/api/api-key.dto'
 
@@ -28,6 +28,13 @@ watch(createOpen, (open) => { if (open) createErrors.clear() })
 
 const revealOpen = ref(false)
 const revealedKey = ref<string>('')
+// Tracks the transient "Copied!" state on the reveal dialog's Copy button so
+// the click gets visual feedback (check icon + label swap) in addition to the toast.
+const copied = ref(false)
+
+// Reset the copy affordance each time the dialog opens — otherwise the check
+// would linger from the previous key's copy action.
+watch(revealOpen, (open) => { if (open) copied.value = false })
 
 async function handleCreate() {
   createErrors.clear()
@@ -60,9 +67,13 @@ async function handleRevoke(k: ApiKeyApiDto) {
   }
 }
 
+let copyResetTimer: ReturnType<typeof setTimeout> | null = null
 async function copyKey() {
   await navigator.clipboard.writeText(revealedKey.value)
+  copied.value = true
   toast.success('Copied to clipboard')
+  if (copyResetTimer) clearTimeout(copyResetTimer)
+  copyResetTimer = setTimeout(() => { copied.value = false }, 1800)
 }
 
 function formatDate(iso: string | null): string {
@@ -261,9 +272,13 @@ const totals = computed(() => {
         </div>
         <DialogFooter>
           <Button variant="outline" @click="revealOpen = false">Close</Button>
-          <Button class="gap-1.5" @click="copyKey">
-            <Copy class="h-3.5 w-3.5" />
-            Copy
+          <Button
+            class="gap-1.5 transition-colors"
+            :class="copied ? 'bg-emerald-500 hover:bg-emerald-500 text-white' : ''"
+            @click="copyKey"
+          >
+            <component :is="copied ? Check : Copy" class="h-3.5 w-3.5" />
+            {{ copied ? 'Copied' : 'Copy' }}
           </Button>
         </DialogFooter>
       </DialogContent>

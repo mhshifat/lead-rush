@@ -60,8 +60,13 @@ public class WebsiteScraperAdapter implements EnrichmentProviderAdapter {
 
         // Confidence: lower for generic inboxes, higher when we matched the person's name.
         int confidence = isGenericLocalPart(best) ? 40 : 70;
+        // Even a name-matched scrape is just a page we read — no verification.
+        // Generic inboxes are weaker: they're real addresses but not person-specific.
+        var level = isGenericLocalPart(best)
+                ? EnrichmentResponse.Confidence.UNKNOWN
+                : EnrichmentResponse.Confidence.UNKNOWN;   // both UNKNOWN; distinction already in the confidence score
         String rawJson = "{\"candidates\":" + found + "}";
-        return EnrichmentResponse.success(best, null, null, null, confidence, rawJson);
+        return EnrichmentResponse.success(best, null, null, null, confidence, level, rawJson);
     }
 
     private Set<String> scrapeDomain(String domain) {

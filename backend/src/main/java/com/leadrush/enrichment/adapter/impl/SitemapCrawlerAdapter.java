@@ -71,8 +71,13 @@ public class SitemapCrawlerAdapter implements EnrichmentProviderAdapter {
             if (best == null) return EnrichmentResponse.notFound("no person-match on team pages");
 
             int confidence = best.fromJsonLd() ? 85 : 65;
+            // JSON-LD hits are structured data (Person schema) — stronger signal
+            // than plain text scraping from a team page. Either way, no verification.
+            var level = best.fromJsonLd()
+                    ? EnrichmentResponse.Confidence.LIKELY
+                    : EnrichmentResponse.Confidence.UNKNOWN;
             return EnrichmentResponse.success(
-                    best.email(), null, best.title(), null, confidence,
+                    best.email(), null, best.title(), null, confidence, level,
                     "{\"source\":\"" + best.sourceUrl() + "\"}");
         } catch (Exception e) {
             log.warn("Sitemap crawler failed for {}: {}", domain, e.getMessage());

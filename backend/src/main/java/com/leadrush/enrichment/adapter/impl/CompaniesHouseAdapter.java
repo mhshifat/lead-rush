@@ -91,7 +91,8 @@ public class CompaniesHouseAdapter implements EnrichmentProviderAdapter {
             return EnrichmentResponse.notFound("contact not listed as an officer in top " + probed + " matched companies");
         } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
             return new EnrichmentResponse(
-                    EnrichmentResponse.Status.RATE_LIMITED, null, null, null, null, null, null,
+                    EnrichmentResponse.Status.RATE_LIMITED, null, null, null, null,
+                    null, EnrichmentResponse.Confidence.UNKNOWN, null,
                     "Companies House rate limit exceeded");
         } catch (org.springframework.web.client.HttpClientErrorException.Unauthorized e) {
             return EnrichmentResponse.error("Companies House API key rejected");

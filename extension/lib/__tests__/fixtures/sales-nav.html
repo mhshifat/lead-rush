@@ -1,0 +1,22 @@
+<!--
+  Minimal stand-in for linkedin.com/sales/lead/<hashed-id>,NAME_SEARCH.
+  Mirrors what the Sales Nav scraper queries.
+-->
+<div class="profile-topcard-person-entity">
+  <h1 data-anonymize="person-name">John Smith</h1>
+  <span data-anonymize="job-title">VP of Sales</span>
+  <a class="profile-topcard-company-profile" href="#">
+    <span data-anonymize="company-name">Globex Corp</span>
+  </a>
+  <span data-anonymize="location">New York, NY</span>
+  <img data-anonymize="headshot-photo" class="profile-topcard-person-entity__image"
+       src="https://media.licdn.com/sn-avatar.jpg" alt="John Smith" />
+
+  <!--
+    Sales Nav exposes a "View LinkedIn profile" link in the topcard; we use it
+    as the canonical URL so imports dedupe with regular-profile imports.
+  -->
+  <a href="https://www.linkedin.com/in/johnsmith" data-control-name="view_linkedin_profile">
+    View LinkedIn profile
+  </a>
+</div>

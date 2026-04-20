@@ -66,8 +66,13 @@ public class CompanyCrawlCacheAdapter implements EnrichmentProviderAdapter {
         log.debug("Crawl cache hit: {} at {}", hit.getName(), hit.getDomain());
         // Exact-name matches get high confidence; partial matches are weaker.
         int confidence = exact != null ? 85 : 60;
+        // Email was captured from a page we crawled — it's real, but we never
+        // SMTP-verified it. Exact match → LIKELY, partial → UNKNOWN.
+        var level = exact != null
+                ? EnrichmentResponse.Confidence.LIKELY
+                : EnrichmentResponse.Confidence.UNKNOWN;
         return EnrichmentResponse.success(
-                hit.getEmail(), null, hit.getJobTitle(), null, confidence,
+                hit.getEmail(), null, hit.getJobTitle(), null, confidence, level,
                 "{\"sourceUrl\":\"" + hit.getSourceUrl() + "\"}");
     }
 

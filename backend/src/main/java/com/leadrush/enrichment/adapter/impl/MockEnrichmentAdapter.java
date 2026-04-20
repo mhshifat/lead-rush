@@ -59,6 +59,7 @@ public class MockEnrichmentAdapter implements EnrichmentProviderAdapter {
                 request.companyName() != null ? "Contact at " + request.companyName() : null,
                 null,                                // no LinkedIn
                 75,                                  // mid confidence
+                EnrichmentResponse.Confidence.LIKELY, // pretend mid-confidence for testing
                 "{\"provider\":\"mock\",\"generated_email\":\"" + email + "\"}"
         );
     }

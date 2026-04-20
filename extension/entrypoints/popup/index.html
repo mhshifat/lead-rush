@@ -4,6 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=360, initial-scale=1" />
     <title>Lead Rush</title>
+    <style>
+      /* Kill Chrome's default white popup chrome — the app's dark bg should
+         reach edge-to-edge. Without this we get a visible white outline. */
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: hsl(240 6% 6%);
+        color-scheme: dark;
+      }
+      #root {
+        min-height: 100vh;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -36,8 +36,23 @@ public class CorsConfig {
         publicCors.setAllowCredentials(false);
         publicCors.setMaxAge(3600L);
 
+        // Extension surface (/api/v1/ext/**): the browser extension runs on a
+        // chrome-extension:// origin that varies per install. Allow any
+        // chrome-extension/moz-extension origin — access is still guarded by
+        // the X-API-Key header inside the request.
+        CorsConfiguration extensionCors = new CorsConfiguration();
+        extensionCors.setAllowedOriginPatterns(List.of(
+                "chrome-extension://*",
+                "moz-extension://*"
+        ));
+        extensionCors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        extensionCors.setAllowedHeaders(List.of("Content-Type", "Accept", "X-API-Key"));
+        extensionCors.setAllowCredentials(false);
+        extensionCors.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/v1/public/**", publicCors);
+        source.registerCorsConfiguration("/api/v1/ext/**", extensionCors);
         source.registerCorsConfiguration("/widget.js", publicCors);
         source.registerCorsConfiguration("/**", app);
         return source;

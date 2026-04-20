@@ -48,6 +48,11 @@ public class DomainPatternAdapter implements EnrichmentProviderAdapter {
         log.debug("Pattern cache hit: {} ({}) → {}", request.companyDomain(), cached.getPatternType(), email);
         // Confidence maps loosely to Hunter's 0-100 scale — higher = more re-confirmations.
         int confidence = Math.min(100, 50 + cached.getConfidence() * 10);
-        return EnrichmentResponse.success(email, null, null, null, confidence, null);
+        // Cached-pattern emails graduate from GUESSED → LIKELY as we see the same
+        // pattern work for more contacts at this domain. Fresh domains stay at GUESSED.
+        var level = cached.getConfidence() >= 2
+                ? EnrichmentResponse.Confidence.LIKELY
+                : EnrichmentResponse.Confidence.GUESSED;
+        return EnrichmentResponse.success(email, null, null, null, confidence, level, null);
     }
 }

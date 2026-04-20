@@ -62,7 +62,8 @@ public class PeopleDataLabsAdapter implements EnrichmentProviderAdapter {
             return EnrichmentResponse.notFound(e.getResponseBodyAsString());
         } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
             return new EnrichmentResponse(
-                    EnrichmentResponse.Status.RATE_LIMITED, null, null, null, null, null, null,
+                    EnrichmentResponse.Status.RATE_LIMITED, null, null, null, null, null,
+                    EnrichmentResponse.Confidence.UNKNOWN, null,
                     "PDL rate limit exceeded");
         } catch (Exception e) {
             log.warn("PDL call failed: {}", e.getMessage());
@@ -93,7 +94,13 @@ public class PeopleDataLabsAdapter implements EnrichmentProviderAdapter {
         }
         // Map PDL 0-10 "likelihood" onto the shared 0-100 confidence scale.
         Integer confidence = likelihood != null ? likelihood * 10 : null;
-        return EnrichmentResponse.success(email, phone, title, linkedinUrl, confidence, json);
+        // PDL's likelihood approximates their internal verification strength:
+        //   9-10 → VERIFIED, 6-8 → LIKELY, below → UNKNOWN
+        EnrichmentResponse.Confidence level;
+        if (likelihood != null && likelihood >= 9) level = EnrichmentResponse.Confidence.VERIFIED;
+        else if (likelihood != null && likelihood >= 6) level = EnrichmentResponse.Confidence.LIKELY;
+        else level = EnrichmentResponse.Confidence.UNKNOWN;
+        return EnrichmentResponse.success(email, phone, title, linkedinUrl, confidence, level, json);
     }
 
     private static String firstEmailInArray(JsonNode emails) {

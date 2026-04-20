@@ -15,7 +15,9 @@ import {
   AtSign, Activity, Briefcase, History, Clock,
   Send, Eye, MousePointerClick, Reply, Target, CheckCircle2,
   XCircle, ClipboardList, Check,
+  ShieldCheck, ShieldQuestion, HelpCircle, Dices,
 } from 'lucide-vue-next'
+import type { EmailVerificationStatus } from '~/entities/contact/contact.entity'
 
 definePageMeta({
   middleware: 'auth',
@@ -188,6 +190,72 @@ function enrollmentStatusVariant(status: string): 'default' | 'secondary' | 'des
     case 'UNSUBSCRIBED': return 'destructive'
     default: return 'outline'
   }
+}
+
+// Sort emails so VERIFIED lands first — users want the strongest signal at the top.
+const sortedEmails = computed(() => {
+  if (!contact.value) return []
+  const rank = (s: EmailVerificationStatus): number => ({
+    VERIFIED: 5, VALID: 5, LIKELY: 4, UNKNOWN: 3, CATCH_ALL: 2, GUESSED: 1, INVALID: 0,
+  })[s] ?? 3
+  return [...contact.value.emails].sort((a, b) => {
+    if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1
+    return rank(b.verificationStatus) - rank(a.verificationStatus)
+  })
+})
+
+function statusVariant(s: EmailVerificationStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (s) {
+    case 'VERIFIED':
+    case 'VALID':     return 'default'
+    case 'LIKELY':    return 'secondary'
+    case 'INVALID':   return 'destructive'
+    case 'CATCH_ALL':
+    case 'GUESSED':
+    case 'UNKNOWN':
+    default:          return 'outline'
+  }
+}
+
+function statusLabel(s: EmailVerificationStatus): string {
+  switch (s) {
+    case 'VERIFIED': return 'Verified'
+    case 'VALID':    return 'Verified'
+    case 'LIKELY':   return 'Likely'
+    case 'INVALID':  return 'Invalid'
+    case 'CATCH_ALL':return 'Catch-all'
+    case 'GUESSED':  return 'Guessed'
+    case 'UNKNOWN':
+    default:         return 'Unverified'
+  }
+}
+
+function statusIcon(s: EmailVerificationStatus) {
+  switch (s) {
+    case 'VERIFIED':
+    case 'VALID':    return ShieldCheck
+    case 'LIKELY':   return CheckCircle2
+    case 'INVALID':  return XCircle
+    case 'CATCH_ALL':return ShieldQuestion
+    case 'GUESSED':  return Dices
+    case 'UNKNOWN':
+    default:         return HelpCircle
+  }
+}
+
+// Adapter provider-key → human label for the "via X" caption.
+function sourceLabel(key: string): string {
+  return ({
+    HUNTER: 'Hunter.io',
+    PDL: 'People Data Labs',
+    GITHUB: 'GitHub commits',
+    SITEMAP_CRAWLER: 'Team page crawl',
+    WEBSITE_SCRAPER: 'Website scrape',
+    COMPANY_CRAWL_CACHE: 'Company crawl',
+    PATTERN_CACHE: 'Pattern guess',
+    MOCK: 'Mock data',
+    EXTENSION: 'Extension',
+  } as Record<string, string>)[key] ?? key
 }
 
 function formatDate(date: Date | null): string {
@@ -417,13 +485,28 @@ function eventIconComponent(type: string) {
 
           <div class="space-y-4 text-sm">
             <div v-if="contact.emails.length">
-              <p class="text-xs uppercase tracking-wider text-muted-foreground mb-2">Email</p>
-              <ul class="space-y-1.5">
-                <li v-for="email in contact.emails" :key="email.id" class="flex items-center gap-2 flex-wrap">
-                  <Mail class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span>{{ email.email }}</span>
-                  <Badge v-if="email.isPrimary" variant="outline" class="text-xs">Primary</Badge>
-                  <Badge variant="secondary" class="text-xs">{{ email.emailType }}</Badge>
+              <p class="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+                Email{{ contact.emails.length > 1 ? `s (${contact.emails.length})` : '' }}
+              </p>
+              <ul class="space-y-2">
+                <li v-for="email in sortedEmails" :key="email.id" class="flex items-start gap-2 flex-wrap">
+                  <Mail class="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span :class="email.isPrimary ? 'font-medium' : ''">{{ email.email }}</span>
+                      <Badge v-if="email.isPrimary" variant="outline" class="text-xs">Primary</Badge>
+                      <Badge
+                        :variant="statusVariant(email.verificationStatus)"
+                        class="text-xs inline-flex items-center gap-1"
+                      >
+                        <component :is="statusIcon(email.verificationStatus)" class="h-3 w-3" />
+                        {{ statusLabel(email.verificationStatus) }}
+                      </Badge>
+                    </div>
+                    <p v-if="email.source" class="text-xs text-muted-foreground mt-0.5">
+                      via <span class="font-mono">{{ sourceLabel(email.source) }}</span>
+                    </p>
+                  </div>
                 </li>
               </ul>
             </div>

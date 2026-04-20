@@ -33,6 +33,7 @@ export interface ContactApiDto {
     emailType: string
     primary: boolean
     verificationStatus: string
+    source: string | null
   }>
 
   phones: Array<{

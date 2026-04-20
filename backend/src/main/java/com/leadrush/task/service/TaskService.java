@@ -114,6 +114,7 @@ public class TaskService {
             case LINKEDIN_MESSAGE -> "Send LinkedIn message to";
             case LINKEDIN_CONNECT -> "Send LinkedIn connection request to";
             case MANUAL -> "Follow up with";
+            case NOTE -> "Note on";
         };
     }
 

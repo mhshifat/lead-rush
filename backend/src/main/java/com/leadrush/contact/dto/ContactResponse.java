@@ -60,7 +60,10 @@ public class ContactResponse {
         private String email;
         private String emailType;
         private boolean primary;
+        /** VERIFIED | LIKELY | UNKNOWN | GUESSED | VALID | INVALID | CATCH_ALL */
         private String verificationStatus;
+        /** Adapter key that produced this row (HUNTER, PATTERN_CACHE, …), or null if user-entered. */
+        private String source;
     }
 
     @Data

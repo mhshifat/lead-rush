@@ -77,7 +77,9 @@ public class GithubEnrichmentAdapter implements EnrichmentProviderAdapter {
         } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
             return new EnrichmentResponse(
                     EnrichmentResponse.Status.RATE_LIMITED,
-                    null, null, null, null, null, null, "GitHub rate limit exceeded");
+                    null, null, null, null, null,
+                    EnrichmentResponse.Confidence.UNKNOWN, null,
+                    "GitHub rate limit exceeded");
         } catch (Exception e) {
             log.warn("GitHub enrichment failed: {}", e.getMessage());
             return EnrichmentResponse.error(e.getMessage());
@@ -88,7 +90,11 @@ public class GithubEnrichmentAdapter implements EnrichmentProviderAdapter {
         String linkedinUrl = null;   // GitHub doesn't expose this
         // "Confidence" is a rough signal — a verified profile email is stronger than a commit scrape.
         int confidence = 60;
-        return EnrichmentResponse.success(email, null, null, linkedinUrl, confidence,
+        // Emails observed in git commits or public profiles are real addresses
+        // the person actively used. LIKELY — as strong as you get without SMTP.
+        return EnrichmentResponse.success(
+                email, null, null, linkedinUrl, confidence,
+                EnrichmentResponse.Confidence.LIKELY,
                 "{\"githubLogin\":\"" + login + "\",\"raw\":" + rawJson + "}");
     }
 

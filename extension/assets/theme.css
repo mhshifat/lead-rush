@@ -8,7 +8,16 @@
 
 @import url('https://rsms.me/inter/inter.css');
 
-:root {
+/*
+  We target :host (for the LinkedIn content-script Shadow DOM), :root (for the
+  popup), AND .lr-reset (fallback for either context) so the custom properties
+  apply everywhere. :root alone doesn't match inside a Shadow DOM — there's no
+  html element in the shadow tree — which was making --lr-fg resolve to "unset"
+  and text fell back to black-on-black.
+*/
+:host,
+:root,
+.lr-reset {
   --lr-bg: hsl(240 6% 6%);
   --lr-fg: hsl(240 5% 96%);
   --lr-fg-muted: hsl(240 5% 60%);
@@ -28,6 +37,13 @@
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-feature-settings: 'cv11', 'ss01', 'ss03';
   -webkit-font-smoothing: antialiased;
+  /*
+    Force our light foreground colour so it wins against LinkedIn's inherited
+    `color: rgba(0,0,0,0.9)` which crosses the shadow boundary through CSS
+    inheritance (color is an inheritable property — shadow isolation only
+    stops selectors, not inheritance through the host).
+  */
+  color: var(--lr-fg);
 }
 
 .lr-root {

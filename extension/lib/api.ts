@@ -29,10 +29,15 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     let message = `Request failed (${res.status})`
+    let rawBody: unknown = null
     try {
-      const body = await res.json()
-      message = body?.error?.message ?? message
+      rawBody = await res.json()
+      message = (rawBody as any)?.error?.message ?? message
     } catch { /* ignore parse errors */ }
+    // Surface the raw response so the user can see WHY the backend rejected —
+    // helpful when a 401 is really a missing header, wrong URL, or the key
+    // was revoked on the server.
+    console.warn('[lead-rush] api error', { url, status: res.status, body: rawBody })
     throw new ApiError(res.status, message)
   }
 

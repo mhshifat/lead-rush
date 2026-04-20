@@ -61,7 +61,8 @@ public class Task extends TenantEntity {
         MANUAL,                 // Created by user
         CALL,                   // Phone call task
         LINKEDIN_MESSAGE,       // Send a LinkedIn DM (manual for now; future: browser extension)
-        LINKEDIN_CONNECT        // Send a LinkedIn connection request
+        LINKEDIN_CONNECT,       // Send a LinkedIn connection request
+        NOTE                    // A written observation — always stored as COMPLETED
     }
 
     public enum TaskStatus {

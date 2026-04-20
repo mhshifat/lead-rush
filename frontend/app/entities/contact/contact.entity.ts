@@ -11,12 +11,18 @@ export type LifecycleStage = 'LEAD' | 'CONTACTED' | 'QUALIFIED' | 'OPPORTUNITY' 
 
 export type ContactSource = 'MANUAL' | 'CSV_IMPORT' | 'FORM' | 'LINKEDIN' | 'API' | 'ENRICHMENT'
 
+export type EmailVerificationStatus =
+  | 'VERIFIED' | 'LIKELY' | 'UNKNOWN' | 'GUESSED'
+  | 'VALID' | 'INVALID' | 'CATCH_ALL'
+
 export interface ContactEmailEntity {
   id: string
   email: string
   emailType: 'WORK' | 'PERSONAL' | 'OTHER'
   isPrimary: boolean
-  verificationStatus: 'UNKNOWN' | 'VALID' | 'INVALID' | 'CATCH_ALL'
+  verificationStatus: EmailVerificationStatus
+  /** Adapter key that produced this email (HUNTER, PATTERN_CACHE, …) or null for user-entered. */
+  source: string | null
 }
 
 export interface ContactPhoneEntity {

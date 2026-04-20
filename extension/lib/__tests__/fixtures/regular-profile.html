@@ -1,0 +1,80 @@
+<!--
+  Minimal stand-in for linkedin.com/in/<vanity>.
+  Each selector block mirrors what the regular-profile scraper queries.
+  Keep trimmed — we're not asserting LinkedIn's UI, just our selector stability.
+-->
+<div class="scaffold-layout__main">
+  <div class="pv-text-details__left-panel">
+    <h1 class="text-heading-xlarge">Jane Doe</h1>
+    <div class="text-body-medium break-words" data-generated-suggestion-target="foo">
+      Senior Engineer at Acme Inc · Building distributed systems
+    </div>
+    <span class="text-body-small inline t-black--light break-words">San Francisco Bay Area</span>
+  </div>
+
+  <img class="pv-top-card-profile-picture__image" src="https://media.licdn.com/avatar.jpg" alt="Jane Doe" />
+
+  <!-- Section: About -->
+  <section>
+    <div id="about"></div>
+    <div class="display-flex full-width">
+      <span aria-hidden="true">Software engineer with 10+ years building scalable platforms.</span>
+    </div>
+  </section>
+
+  <!-- Section: Experience -->
+  <section>
+    <div id="experience"></div>
+    <ul>
+      <li class="artdeco-list__item">
+        <div class="mr1">
+          <span aria-hidden="true">Senior Engineer</span>
+        </div>
+        <span class="t-14 t-normal">
+          <span aria-hidden="true">Acme Inc · Full-time</span>
+        </span>
+        <span class="pvs-entity__caption-wrapper">2021 · Present</span>
+      </li>
+      <li class="artdeco-list__item">
+        <div class="mr1">
+          <span aria-hidden="true">Engineer</span>
+        </div>
+        <span class="t-14 t-normal">
+          <span aria-hidden="true">Globex · Full-time</span>
+        </span>
+        <span class="pvs-entity__caption-wrapper">2018 · 2021</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Section: Education -->
+  <section>
+    <div id="education"></div>
+    <ul>
+      <li class="artdeco-list__item">
+        <div class="mr1">
+          <span aria-hidden="true">Stanford University</span>
+        </div>
+        <span class="t-14 t-normal">
+          <span aria-hidden="true">Bachelor of Science, Computer Science</span>
+        </span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Section: Skills -->
+  <section>
+    <div id="skills"></div>
+    <ul>
+      <li class="artdeco-list__item">
+        <div class="mr1"><span aria-hidden="true">TypeScript</span></div>
+      </li>
+      <li class="artdeco-list__item">
+        <div class="mr1"><span aria-hidden="true">Java</span></div>
+      </li>
+      <li class="artdeco-list__item">
+        <div class="mr1"><span aria-hidden="true">PostgreSQL</span></div>
+      </li>
+    </ul>
+  </section>
+</div>

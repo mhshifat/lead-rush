@@ -47,6 +47,29 @@ const newContact = ref({
   title: '',
 })
 
+// Query-param prefill — lets the Gmail extension deep-link "Add to Lead Rush"
+// straight into this dialog with the sender's email/name already filled in.
+// `?new=1` opens the dialog; other params hydrate the form.
+const route = useRoute()
+const router = useRouter()
+onMounted(() => {
+  const q = route.query
+  const hasPrefill = q.new === '1' || q.email || q.firstName
+  if (!hasPrefill) return
+
+  newContact.value = {
+    firstName: typeof q.firstName === 'string' ? q.firstName : '',
+    lastName: typeof q.lastName === 'string' ? q.lastName : '',
+    email: typeof q.email === 'string' ? q.email : '',
+    companyName: typeof q.companyName === 'string' ? q.companyName : '',
+    title: typeof q.title === 'string' ? q.title : '',
+  }
+  createDialogOpen.value = true
+
+  // Strip the query so a page refresh (or shared URL) doesn't re-pop the dialog.
+  void router.replace({ query: {} })
+})
+
 const createErrors = useFieldErrors()
 
 // Touch-to-clear: remove the error the moment the user starts fixing the field.

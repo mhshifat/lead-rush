@@ -53,7 +53,8 @@ public class HunterEnrichmentAdapter implements EnrichmentProviderAdapter {
         } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
             log.warn("Hunter rate limit hit: {}", e.getMessage());
             return new EnrichmentResponse(
-                    EnrichmentResponse.Status.RATE_LIMITED, null, null, null, null, null, null,
+                    EnrichmentResponse.Status.RATE_LIMITED, null, null, null, null, null,
+                    EnrichmentResponse.Confidence.UNKNOWN, null,
                     "Rate limit exceeded");
         } catch (Exception e) {
             log.warn("Hunter API call failed: {}", e.getMessage());
@@ -86,7 +87,16 @@ public class HunterEnrichmentAdapter implements EnrichmentProviderAdapter {
         String title = text(data, "position");
         String linkedinUrl = text(data, "linkedin_url");
 
-        return EnrichmentResponse.success(email, null, title, linkedinUrl, score, json);
+        // Map Hunter's 0-100 score to our qualitative levels.
+        //   >= 90  → VERIFIED (deliverable, low-risk)
+        //   60-89  → LIKELY (probable, worth using)
+        //   < 60   → UNKNOWN (Hunter wasn't confident)
+        EnrichmentResponse.Confidence level;
+        if (score != null && score >= 90) level = EnrichmentResponse.Confidence.VERIFIED;
+        else if (score != null && score >= 60) level = EnrichmentResponse.Confidence.LIKELY;
+        else level = EnrichmentResponse.Confidence.UNKNOWN;
+
+        return EnrichmentResponse.success(email, null, title, linkedinUrl, score, level, json);
     }
 
     private String text(JsonNode node, String field) {

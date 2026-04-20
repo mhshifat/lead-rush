@@ -124,18 +124,22 @@ public class EnrichmentService {
         Contact contact = contactRepository.findByIdAndWorkspaceId(contactId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contact", contactId));
 
-        EnrichmentResult result = waterfallService.enrichContact(contact);
-        if (result == null) {
+        var outcome = waterfallService.enrichContactFully(contact);
+        EnrichmentResult result = outcome.best();
+        if (result == null && outcome.allEmails().isEmpty()) {
             return null;
         }
 
         // On SUCCESS: apply the enriched fields to the contact (only fill missing fields)
-        if (result.getStatus() == EnrichmentResult.ResultStatus.SUCCESS) {
+        if (result != null && result.getStatus() == EnrichmentResult.ResultStatus.SUCCESS) {
             applyEnrichmentToContact(contact, result);
-            contactRepository.save(contact);
         }
+        // Always persist every distinct email the waterfall found, each tagged
+        // with its source adapter + qualitative confidence.
+        applyDiscoveredEmails(contact, outcome.allEmails());
+        contactRepository.save(contact);
 
-        return toResultResponse(result);
+        return result != null ? toResultResponse(result) : null;
     }
 
     /**
@@ -180,7 +184,8 @@ public class EnrichmentService {
 
     /**
      * Merge enrichment data into contact — only fills empty fields, never overwrites.
-     * Also auto-adds a discovered email if the contact didn't have one.
+     * NOTE: email handling is split out into {@link #applyDiscoveredEmails} so that
+     * every discovered email across the waterfall (not just the best one) is stored.
      */
     private void applyEnrichmentToContact(Contact contact, EnrichmentResult result) {
         if (result.getFoundTitle() != null && (contact.getTitle() == null || contact.getTitle().isBlank())) {
@@ -191,22 +196,81 @@ public class EnrichmentService {
             contact.setLinkedinUrl(result.getFoundLinkedinUrl());
         }
 
-        // Add email if the contact doesn't have one yet
-        if (result.getFoundEmail() != null && contact.getPrimaryEmail() == null) {
-            ContactEmail email = ContactEmail.builder()
-                    .email(result.getFoundEmail())
-                    .emailType(ContactEmail.EmailType.WORK)
-                    .primary(true)
-                    .verificationStatus(ContactEmail.VerificationStatus.UNKNOWN)
-                    .build();
-            email.setWorkspaceId(contact.getWorkspaceId());
-            contact.addEmail(email);
-        }
-
         // Tag source as enriched if it wasn't set
         if (contact.getSource() == null) {
             contact.setSource(ContactSource.ENRICHMENT);
         }
+    }
+
+    /**
+     * Persists every distinct email the waterfall discovered. Each row:
+     *   - has its own {@code verificationStatus} derived from the adapter's confidence
+     *   - is tagged with {@code source = providerKey} for "Hunter — verified" UI
+     *   - is deduped by lowercase email so re-runs don't add duplicates
+     *
+     * The first row added (or the first VERIFIED if there is one) becomes primary
+     * when the contact has no primary email yet.
+     */
+    private void applyDiscoveredEmails(
+            Contact contact,
+            List<EnrichmentWaterfallService.DiscoveredEmail> discovered
+    ) {
+        if (discovered == null || discovered.isEmpty()) return;
+
+        // Existing addresses (case-insensitive) we already have on this contact.
+        // Re-running enrichment shouldn't produce duplicate rows.
+        var existing = contact.getEmails().stream()
+                .map(e -> e.getEmail().toLowerCase(java.util.Locale.ROOT))
+                .collect(java.util.stream.Collectors.toSet());
+
+        // Sort so VERIFIED lands first, then LIKELY → UNKNOWN → GUESSED.
+        // Whichever lands first becomes the primary if the contact has none yet.
+        var sorted = discovered.stream()
+                .sorted(java.util.Comparator.comparingInt(
+                        (EnrichmentWaterfallService.DiscoveredEmail d) -> -rank(d.confidence())))
+                .toList();
+
+        boolean contactHadPrimary = contact.getPrimaryEmail() != null;
+        boolean primaryAssigned = contactHadPrimary;
+
+        for (var d : sorted) {
+            if (d.email() == null || d.email().isBlank()) continue;
+            if (existing.contains(d.email().toLowerCase(java.util.Locale.ROOT))) continue;
+
+            ContactEmail row = ContactEmail.builder()
+                    .email(d.email())
+                    .emailType(ContactEmail.EmailType.WORK)
+                    .primary(!primaryAssigned)   // first unseen + caller has no primary → become primary
+                    .verificationStatus(mapConfidence(d.confidence()))
+                    .source(d.providerKey())
+                    .build();
+            row.setWorkspaceId(contact.getWorkspaceId());
+            contact.addEmail(row);
+            existing.add(d.email().toLowerCase(java.util.Locale.ROOT));
+            if (!primaryAssigned) primaryAssigned = true;
+        }
+    }
+
+    /** Qualitative Confidence → persisted VerificationStatus. */
+    private static ContactEmail.VerificationStatus mapConfidence(
+            EnrichmentProviderAdapter.EnrichmentResponse.Confidence c
+    ) {
+        if (c == null) return ContactEmail.VerificationStatus.UNKNOWN;
+        return switch (c) {
+            case VERIFIED -> ContactEmail.VerificationStatus.VERIFIED;
+            case LIKELY   -> ContactEmail.VerificationStatus.LIKELY;
+            case UNKNOWN  -> ContactEmail.VerificationStatus.UNKNOWN;
+            case GUESSED  -> ContactEmail.VerificationStatus.GUESSED;
+        };
+    }
+
+    private static int rank(EnrichmentProviderAdapter.EnrichmentResponse.Confidence c) {
+        return switch (c) {
+            case VERIFIED -> 4;
+            case LIKELY   -> 3;
+            case UNKNOWN  -> 2;
+            case GUESSED  -> 1;
+        };
     }
 
     private EnrichmentProviderAdapter findAdapter(String key) {

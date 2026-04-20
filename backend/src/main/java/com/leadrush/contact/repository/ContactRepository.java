@@ -52,4 +52,34 @@ public interface ContactRepository extends JpaRepository<Contact, UUID>,
     java.util.List<Object[]> lifecycleDistribution(
         @org.springframework.data.repository.query.Param("workspaceId") UUID workspaceId
     );
+
+    /**
+     * Fuzzy name match used by the extension's duplicate-detector. Matches when
+     * both firstName and lastName prefix-match (case-insensitive) — we skip
+     * substring matching for the last name to avoid pairing "Andrea" with
+     * "Andrea Smith-Andrews". A LIKE with leading wildcard kills the index so
+     * keep this bounded to distinct name pairs.
+     *
+     * Excludes contacts that already have the incoming LinkedIn URL (they'd have
+     * matched the exact linkedinUrl path and never reached this query).
+     */
+    @org.springframework.data.jpa.repository.Query("""
+        SELECT c FROM Contact c
+        WHERE c.workspaceId = :workspaceId
+          AND LOWER(c.firstName) = LOWER(:firstName)
+          AND (
+            :lastName IS NULL
+            OR c.lastName IS NULL
+            OR LOWER(c.lastName) = LOWER(:lastName)
+          )
+          AND (c.linkedinUrl IS NULL OR LOWER(c.linkedinUrl) <> LOWER(:excludeLinkedinUrl))
+        ORDER BY c.updatedAt DESC
+    """)
+    java.util.List<Contact> findPossibleMatches(
+        @org.springframework.data.repository.query.Param("workspaceId") UUID workspaceId,
+        @org.springframework.data.repository.query.Param("firstName") String firstName,
+        @org.springframework.data.repository.query.Param("lastName") String lastName,
+        @org.springframework.data.repository.query.Param("excludeLinkedinUrl") String excludeLinkedinUrl,
+        Pageable pageable
+    );
 }
